@@ -1,5 +1,12 @@
-This project sponsored by <img width="289" height="51" alt="image" src="https://github.com/user-attachments/assets/5eef16c4-a4a4-413f-bc3d-3e2c35d50cc5" />
-[DLS by LABs21](https://dls.labs21.dev/?utm_source=github&utm_medium=banner&utm_campaign=promptv)
+This project sponsored by [DLS by LABs21](https://dls.labs21.dev/?utm_source=github&utm_medium=banner&utm_campaign=promptv)
+
+<img width="289" height="51" alt="image" src="https://github.com/user-attachments/assets/5eef16c4-a4a4-413f-bc3d-3e2c35d50cc5" />
+
+
+
+If you think this project is helpful, treat me a coffee.
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/fdatwlnur)
 
 
 # promptv - Prompt Versioning CLI Tool
