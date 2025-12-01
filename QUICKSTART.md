@@ -14,55 +14,88 @@ uv pip install -e .
 pip install -e .
 ```
 
+## Initialization
+
+Initialize promptv to create the required directory structure:
+
+```bash
+promptv init
+```
+
+This creates:
+- `~/.promptv/.config/` - Configuration and pricing data
+- `~/.promptv/.secrets/` - Secure API key storage
+- `~/.promptv/prompts/` - Your saved prompts
+
+**Note:** promptv auto-initializes on first command if not already done.
+
 ## Quick Start
 
-### 1. Create Your First Prompt
+### 1. Set Up API Keys
+
+```bash
+# Set provider API key (for OpenAI, Anthropic, etc.)
+promptv secrets set openai --provider
+
+# Set generic secrets (with optional project scoping)
+promptv secrets set DATABASE_URL
+promptv secrets set API_KEY --project my-app
+
+# List all secrets
+promptv secrets list
+
+# Activate secrets in your shell (like 'source .env')
+source <(promptv secrets activate)
+source <(promptv secrets activate --project my-app)
+```
+
+### 2. Create Your First Prompt
 
 ```bash
 # Create a simple prompt
-python -m promptv.cli set greeting -c "Hello, {{name}}!"
+promptv set greeting -c "Hello, {{name}}!"
 
 # Create a more complex prompt with multiple variables
-python -m promptv.cli set welcome-email -c "Hello {{user_name}}, welcome to {{product}}!"
+promptv set welcome-email -c "Hello {{user_name}}, welcome to {{product}}!"
 ```
 
-### 2. Tag Versions
+### 3. Tag Versions
 
 ```bash
 # Tag the current version as production
-python -m promptv.cli tag create welcome-email prod --description "Production ready"
+promptv tag create welcome-email prod --description "Production ready"
 
 # Tag as staging
-python -m promptv.cli tag create welcome-email staging --description "Staging environment"
+promptv tag create welcome-email staging --description "Staging environment"
 ```
 
-### 3. Retrieve and Render Prompts
+### 4. Retrieve and Render Prompts
 
 ```bash
 # Get prompt by tag
-python -m promptv.cli get welcome-email --label prod
+promptv get welcome-email --label prod
 
 # Render with variables
-python -m promptv.cli render welcome-email --var user_name=Alice --var product=PromptV
+promptv render welcome-email --var user_name=Alice --var product=PromptV
 
 # Get by tag and render in one command
-python -m promptv.cli get welcome-email --label prod --var user_name=Bob --var product="PromptV CLI"
+promptv get welcome-email --label prod --var user_name=Bob --var product="PromptV CLI"
 ```
 
-### 4. List and Inspect
+### 5. List and Inspect
 
 ```bash
 # List all prompts
-python -m promptv.cli list
+promptv list
 
 # List with tags and variables
-python -m promptv.cli list --show-tags --show-variables
+promptv list --show-tags --show-variables
 
 # Show variables in a prompt
-python -m promptv.cli variables list welcome-email
+promptv variables list welcome-email
 
 # Show all tags
-python -m promptv.cli tag list welcome-email
+promptv tag list welcome-email
 ```
 
 ## Python SDK Usage
@@ -85,6 +118,38 @@ prompt = client.get_prompt(
     variables={'user_name': 'Alice', 'product': 'PromptV'}
 )
 print(prompt)  # "Hello Alice, welcome to PromptV!"
+```
+
+### Secrets Management via SDK
+
+```python
+from promptv.sdk import PromptClient
+
+client = PromptClient()
+
+# Set provider API key
+client.set_api_key("openai", "sk-...")
+
+# Set generic secret
+client.set_secret("DATABASE_URL", "postgres://...")
+client.set_secret("API_KEY", "abc123", project="my-app")
+
+# Get secrets
+openai_key = client.get_api_key("openai")
+db_url = client.get_secret("DATABASE_URL")
+api_key = client.get_secret("API_KEY", project="my-app")
+
+# List all secrets
+all_secrets = client.list_secrets()
+print(f"Providers: {all_secrets['providers']}")
+for project, keys in all_secrets['secrets'].items():
+    print(f"{project}: {keys}")
+
+# Programmatic access to secrets (useful for automation)
+from promptv.secrets_manager import SecretsManager
+manager = SecretsManager()
+secrets = manager.get_project_secrets_with_values(project="my-app")
+# Returns: {"DATABASE_URL": "postgres://...", "API_KEY": "abc123", ...}
 ```
 
 ### Advanced SDK Features
@@ -245,19 +310,48 @@ promptv playground my-prompt
 ### Secure API Key Storage
 
 ```bash
-# Set API key (stored in OS keyring)
-python -m promptv.cli secrets set openai
+# Set API key (stored securely)
+promptv secrets set openai --provider
 # Enter your API key: [input hidden]
 
-# List configured providers
-python -m promptv.cli secrets list
+# Set generic secrets
+promptv secrets set DATABASE_URL
+promptv secrets set API_KEY --project my-app
+
+# List configured secrets
+promptv secrets list
 
 # Test if key exists
-python -m promptv.cli secrets test openai
+promptv secrets test openai
 
 # Delete API key
-python -m promptv.cli secrets delete openai
+promptv secrets delete openai --provider
+
+# Activate secrets in shell (like 'source .env')
+source <(promptv secrets activate --project my-app)
 ```
+
+### Shell Function Helper
+
+Add this to your `~/.bashrc` or `~/.zshrc` for convenient secret activation:
+
+```bash
+# Convenient alias for activating secrets
+promptv-activate() {
+    eval "$(promptv secrets activate --project ${1:-default})"
+}
+
+# Usage examples:
+promptv-activate                # Activate default project
+promptv-activate moonshoot      # Activate moonshoot project
+promptv-activate my-app         # Activate my-app project
+```
+
+**How it works:**
+- Exports all project secrets as environment variables
+- Provider API keys become `PROVIDER_API_KEY` (e.g., `OPENAI_API_KEY`)
+- Works like `source .env` but pulls from secure storage
+- Changes only affect the current shell session
 
 ### Supported Providers
 
@@ -281,22 +375,22 @@ API keys are stored securely in:
 
 ```bash
 # 1. Create initial prompt
-python -m promptv.cli set my-prompt -c "Your prompt here with {{variable}}"
+ promptv set my-prompt -c "Your prompt here with {{variable}}"
 
 # 2. Tag as development
-python -m promptv.cli tag create my-prompt dev
+ promptv tag create my-prompt dev
 
 # 3. Update prompt
-python -m promptv.cli set my-prompt -c "Updated prompt with {{variable}}"
+ promptv set my-prompt -c "Updated prompt with {{variable}}"
 
 # 4. Tag as staging
-python -m promptv.cli tag create my-prompt staging
+ promptv tag create my-prompt staging
 
 # 5. Test in staging
-python -m promptv.cli get my-prompt --label staging --var variable=test
+ promptv get my-prompt --label staging --var variable=test
 
 # 6. Promote to production
-python -m promptv.cli tag create my-prompt prod
+ promptv tag create my-prompt prod
 ```
 
 ### Using in Python Applications
@@ -423,20 +517,20 @@ print(staging_version)
 
 ```bash
 # Good
-python -m promptv.cli tag create my-prompt v1.0.0-prod --description "Production release 1.0.0"
+ promptv tag create my-prompt v1.0.0-prod --description "Production release 1.0.0"
 
 # Better
-python -m promptv.cli tag create my-prompt stable-2025-12 --description "Stable release December 2025"
+ promptv tag create my-prompt stable-2025-12 --description "Stable release December 2025"
 ```
 
 ### 2. Always Use Variables for Dynamic Content
 
 ```bash
 # Don't hardcode values
-python -m promptv.cli set bad-prompt -c "Hello Alice, welcome to MyApp!"
+ promptv set bad-prompt -c "Hello Alice, welcome to MyApp!"
 
 # Use variables instead
-python -m promptv.cli set good-prompt -c "Hello {{name}}, welcome to {{app}}!"
+ promptv set good-prompt -c "Hello {{name}}, welcome to {{app}}!"
 ```
 
 ### 3. Use Context Managers in Long-Running Apps
@@ -460,19 +554,7 @@ client = PromptClient(cache_ttl=600)  # 10 minutes
 prompt = client.get_prompt('my-prompt', use_cache=False)
 ```
 
-## Troubleshooting
 
-### Keyring Not Available
-
-If you see keyring errors:
-
-```bash
-# Set environment variable as fallback
-export OPENAI_API_KEY="your-key-here"
-
-# Or use a keyring backend that works on headless systems
-pip install keyrings.alt
-```
 
 ### Module Not Found Errors
 
@@ -519,19 +601,19 @@ uv run pytest tests/unit/test_sdk_client.py -v
 
 ```bash
 # CLI help
-python -m promptv.cli --help
+ promptv --help
 
 # Command-specific help
-python -m promptv.cli tag --help
-python -m promptv.cli secrets --help
+ promptv tag --help
+ promptv secrets --help
 
 # Check version
-python -m promptv.cli --version
+ promptv --version
 ```
 
 ---
 
-**Current Version**: 2.0.0  
+**Current Version**: 0.1.2  
 **Status**: All Phases Complete (1, 2, 3, 4) ✅  
 **Tests**: 231/231 passing (100%)  
 **Coverage**: 65% overall, 90%+ for core modules  

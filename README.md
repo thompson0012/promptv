@@ -2,12 +2,13 @@ This project sponsored by [DLS by LABs21](https://dls.labs21.dev/?utm_source=git
 
 <img width="289" height="51" alt="image" src="https://github.com/user-attachments/assets/5eef16c4-a4a4-413f-bc3d-3e2c35d50cc5" />
 
-
-
 If you think this project is helpful, treat me a coffee.
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/fdatwlnur)
 
+=================
+
+WARNING: This is a pre-release version of promptv. Expect breaking changes.
 
 # promptv - Prompt Versioning CLI Tool
 
@@ -41,31 +42,42 @@ python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install the package
-pip install -e .
+pip install promptv
 ```
 
-After installation, you can use `promptv` command directly instead of `python -m promptv.cli`.
-
 ## Configuration
+
+### First-time Setup
+
+Initialize promptv to create the required directory structure:
+
+```bash
+promptv init
+```
+
+This creates:
+
+```
+~/.promptv/
+├── .config/
+│   ├── config.yaml      # User configuration
+│   └── pricing.yaml     # LLM pricing data (customizable)
+├── .secrets/
+│   └── secrets.json     # API keys and secrets
+└── prompts/             # Saved prompts
+```
+
+**Note:** promptv will automatically initialize on first command if not already done.
 
 On first run, promptv creates `~/.promptv/.config/config.yaml` with default settings.
 
 ### Execution Modes
 
 **Local Mode (default)**: Stores all data in `~/.promptv/`
+
 ```yaml
 execution:
   mode: "local"
-```
-
-**Cloud Mode**: Stores data in cloud with API credentials
-```yaml
-execution:
-  mode: "cloud"
-  cloud:
-    api_key: "your-api-key"
-    project_id: "your-project-id"
-    endpoint: "https://api.promptv.io"
 ```
 
 ### LLM Provider Configuration
@@ -85,11 +97,29 @@ llm_providers:
     default_model: "custom-model"
 ```
 
+### Customizing LLM Pricing
+
+You can customize LLM pricing by editing `~/.promptv/.config/pricing.yaml`. This allows you to:
+
+- Update pricing for existing models
+- Add new models
+- Adjust pricing for local/custom models
+
+The file is copied from package resources during initialization and never auto-updated.
+
 ## Usage
 
 ### Commands
 
+0. **init** - Initialize promptv directory structure
+
+   ```bash
+   promptv init                    # Create directory structure
+   promptv init --force            # Delete and recreate (WARNING: destructive!)
+   ```
+
 1. **commit** - Save a prompt file with a specific name
+
    ```bash
    promptv commit --source file.md --name prompt-name
    promptv commit --source file.md --name prompt-name -m "Update message"
@@ -97,6 +127,7 @@ llm_providers:
    ```
 
 2. **set** - Set/update a prompt with the given name
+
    ```bash
    promptv set prompt-name --file file.txt
    promptv set prompt-name --content "Prompt content"
@@ -104,24 +135,27 @@ llm_providers:
    ```
 
 3. **get** - Retrieve a specific version of a prompt
+
    ```bash
    promptv get prompt-name --version latest
    promptv get prompt-name --version 1
    promptv get prompt-name --label prod
-   
+
    # Variable substitution - space-separated key=value pairs
    promptv get prompt-name --var "name=Alice count=5"
-   
+
    # Multiple --var flags also supported
    promptv get prompt-name --var key1=val1 --var key2=val2
    ```
 
 4. **list** - List all versions and metadata for a prompt
+
    ```bash
    promptv list prompt-name
    ```
 
 5. **remove** - Remove one or more prompts
+
    ```bash
    promptv remove prompt-name
    promptv remove prompt1 prompt2 prompt3
@@ -129,6 +163,7 @@ llm_providers:
    ```
 
 6. **tags** - Manage tags/labels for versions
+
    ```bash
    promptv tags create prompt-name tag-name --version 1
    promptv tags list prompt-name
@@ -136,24 +171,40 @@ llm_providers:
    ```
 
 7. **secrets** - Manage API keys and secrets securely
+
    ```bash
-   # Set provider API key
-   promptv secrets set openai_api_key
-   
-   # Set custom secret (project-scoped)
-   promptv secrets set db_password --project my-app
-   
+   # Set provider API key (validated against supported providers)
+   promptv secrets set openai --provider
+   promptv secrets set anthropic --provider
+
+   # Set generic secret (default project)
+   promptv secrets set DATABASE_URL
+   promptv secrets set MY_API_KEY
+
+   # Set project-scoped secret
+   promptv secrets set DATABASE_URL --project my-app
+   promptv secrets set REDIS_URL --project moonshoot
+
    # Get secret
-   promptv secrets get openai_api_key
-   
-   # List configured providers
-   promptv secrets list
-   
+   promptv secrets get openai --provider          # Shows masked (last 4 chars)
+   promptv secrets get DATABASE_URL               # Shows full value
+   promptv secrets get API_KEY --project my-app   # Get from specific project
+
+   # List all secrets
+   promptv secrets list                           # All secrets
+   promptv secrets list --project my-app          # Filter by project
+
    # Delete secret
-   promptv secrets delete openai_api_key
+   promptv secrets delete openai --provider
+   promptv secrets delete DATABASE_URL --project my-app --yes
+
+   # Activate secrets in shell (like 'source .env')
+   source <(promptv secrets activate --project moonshoot)
+   eval "$(promptv secrets activate --project moonshoot)"
    ```
 
 8. **diff** - Compare two versions of a prompt
+
    ```bash
    promptv diff prompt-name v1 v2
    promptv diff prompt-name --label prod --label staging
@@ -162,12 +213,14 @@ llm_providers:
    ```
 
 9. **estimate-cost** - Estimate cost of running a prompt
+
    ```bash
    promptv estimate-cost prompt-name --model gpt-4 --provider openai
    promptv estimate-cost prompt-name --output-tokens 1000
    ```
 
 10. **playground** - Launch interactive TUI for testing prompts
+
     ```bash
     promptv playground
     promptv playground --prompt prompt-name
@@ -178,6 +231,126 @@ llm_providers:
     promptv test --suite test-suite.json
     ```
 
+## Secrets Management
+
+promptv provides secure storage for API keys and generic secrets:
+
+### Provider API Keys
+
+Store API keys for supported LLM providers (openai, anthropic, cohere, etc.):
+
+```bash
+# Set provider API key (validated)
+promptv secrets set openai --provider
+promptv secrets set anthropic --provider
+
+# Get provider key (shows last 4 chars only)
+promptv secrets get openai --provider
+
+# Delete provider key
+promptv secrets delete openai --provider
+```
+
+### Generic Secrets
+
+Store any secrets with optional project scoping:
+
+```bash
+# Default project
+promptv secrets set DATABASE_URL
+promptv secrets set API_KEY
+
+# Project-scoped
+promptv secrets set DATABASE_URL --project my-app
+promptv secrets set REDIS_URL --project moonshoot
+
+# Retrieve secrets
+promptv secrets get DATABASE_URL
+promptv secrets get API_KEY --project my-app
+```
+
+### Listing Secrets
+
+```bash
+# List all secrets
+promptv secrets list
+
+# Example output:
+# Provider API Keys:
+#   ✓ openai
+#   ✓ anthropic
+#
+# Project Secrets:
+#   default:
+#     ✓ DATABASE_URL
+#     ✓ API_KEY
+#
+#   my-app:
+#     ✓ DB_PASSWORD
+#     ✓ REDIS_URL
+
+# Filter by project
+promptv secrets list --project my-app
+```
+
+### Activating Secrets in Shell
+
+Similar to `source .env`, you can export all secrets for a project to your current shell:
+
+```bash
+# Basic usage - activate default project
+source <(promptv secrets activate)
+
+# Activate specific project
+source <(promptv secrets activate --project moonshoot)
+
+# Alternative syntax with eval
+eval "$(promptv secrets activate --project moonshoot)"
+
+# Exclude provider API keys
+source <(promptv secrets activate --project moonshoot --no-include-providers)
+```
+
+**Shell Function Helper** (add to `~/.bashrc` or `~/.zshrc`):
+
+```bash
+# Convenient alias for activating secrets
+promptv-activate() {
+    eval "$(promptv secrets activate --project ${1:-default})"
+}
+
+# Usage:
+promptv-activate                # Activate default project
+promptv-activate moonshoot      # Activate moonshoot project
+```
+
+**How it works:**
+
+- Exports all secrets for the specified project as environment variables
+- Provider API keys are exported as `PROVIDER_API_KEY` (e.g., `OPENAI_API_KEY`)
+- Works like `source .env` but pulls from promptv's secure storage
+- Changes only affect the current shell session
+
+**Output formats:**
+
+```bash
+# Shell format (default) - includes comment
+promptv secrets activate --project moonshoot
+
+# Export statements only (no comments)
+promptv secrets activate --project moonshoot --format export
+
+# JSON format for other tools
+promptv secrets activate --project moonshoot --format json
+```
+
+### Security
+
+- All secrets are stored in `~/.promptv/.secrets/secrets.json`
+- File has restrictive permissions (0600 - owner read/write only)
+- Secrets directory has restrictive permissions (0700 - owner access only)
+- Provider API keys show only last 4 characters when retrieved
+
 ## Project Organization
 
 Use project tags to organize prompts and secrets:
@@ -187,10 +360,10 @@ Use project tags to organize prompts and secrets:
 promptv commit --source prompt.md --name my-prompt --project my-app
 
 # Set project-scoped secret
-promptv secrets set db_password --project my-app
+promptv secrets set DATABASE_URL --project my-app
 
 # Get secret for specific project
-promptv secrets get db_password --project my-app
+promptv secrets get DATABASE_URL --project my-app
 ```
 
 ## Variable Substitution
@@ -206,6 +379,7 @@ Support: {{ support_email }}
 ```
 
 Retrieve with variables:
+
 ```bash
 promptv get welcome-email --var "name=Alice product=MyApp support_email=help@example.com"
 ```
@@ -224,7 +398,7 @@ Create a test suite JSON file:
   "test_cases": [
     {
       "name": "test-formal",
-      "variables": {"tone": "formal", "name": "Alice"},
+      "variables": { "tone": "formal", "name": "Alice" },
       "expected_contains": ["Dear", "Alice"],
       "max_tokens": 100
     }
@@ -233,6 +407,7 @@ Create a test suite JSON file:
 ```
 
 Run tests:
+
 ```bash
 promptv test --suite tests.json --output results.json
 ```
@@ -305,6 +480,7 @@ promptv playground --prompt my-prompt
 ## Development
 
 Run tests:
+
 ```bash
 pytest
 pytest --cov=promptv  # With coverage
@@ -312,4 +488,4 @@ pytest --cov=promptv  # With coverage
 
 ## License
 
-MIT License
+Apache License, Version 2.0
