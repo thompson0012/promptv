@@ -10,7 +10,7 @@ If you think this project is helpful, treat me a coffee.
 
 WARNING: This is a pre-release version of promptv. Expect breaking changes.
 
-# promptv - Prompt Versioning CLI Tool
+# promptv - Prompt Versioning CLI Tool & Environment Variable Management Tool
 
 A command-line interface tool for managing prompts locally with versioning support.
 
