@@ -1,6 +1,7 @@
 import click
 import sys
 from pathlib import Path
+import shutil
 from .manager import PromptManager
 from .tag_manager import TagManager
 from .variable_engine import VariableEngine
@@ -8,6 +9,7 @@ from .secrets_manager import (
     SecretsManager,
     SecretsManagerError
 )
+from .config_manager import ConfigManager
 from .exceptions import (
     PromptNotFoundError,
     TagNotFoundError,
@@ -22,21 +24,32 @@ from .utils import (
     format_token_count,
     format_error
 )
-from .resources import list_available_models
+from .resources import list_available_models, get_pricing_data_date
 from .diff_engine import DiffEngine, DiffFormat
 from .playground.app import run_playground
 
 
 @click.group()
-@click.version_option(version='0.1.2')
-def cli():
+@click.version_option(version='0.1.3')
+@click.pass_context
+def cli(ctx):
     """
     promptv - A CLI tool for managing prompts locally with versioning.
     
     On first run, creates ~/.promptv/.config and ~/.promptv/prompts directories.
     All prompts are saved in Markdown (.md) format.
     """
-    pass
+    # Auto-initialize on first run (skip for 'init' command)
+    if ctx.invoked_subcommand != 'init':
+        base_dir = Path.home() / ".promptv"
+        if not base_dir.exists():
+            try:
+                # Silent initialization
+                initialize_promptv_directory(silent=True)
+            except Exception:
+                # Silently ignore initialization errors
+                # User can run 'promptv init' explicitly if needed
+                pass
 
 
 @cli.command()
@@ -673,57 +686,101 @@ def variables_list(prompt_name, version):
 
 @cli.group()
 def secrets():
-    """Manage API keys and secrets securely."""
+    """
+    Manage API keys and secrets securely.
+    
+    Supports both provider API keys and generic project-scoped secrets.
+    All secrets are stored encrypted in ~/.promptv/.secrets/secrets.json
+    
+    Examples:
+        # Provider API keys
+        promptv secrets set openai --provider
+        promptv secrets get openai --provider
+        
+        # Generic secrets
+        promptv secrets set DATABASE_URL
+        promptv secrets set API_KEY --project my-app
+        promptv secrets list
+    """
     pass
 
 
 @secrets.command('set')
-@click.argument('provider')
-def secrets_set(provider):
+@click.argument('key')
+@click.option('--provider', is_flag=True, 
+              help='Set as provider API key (validates against supported providers)')
+@click.option('--project', default='default', 
+              help='Project name for secret scoping (default: "default")')
+def secrets_set(key, provider, project):
     """
-    Set an API key for a provider securely.
+    Set an API key or environment secret.
     
-    The API key is stored in your system's native credential store:
-      - macOS: Keychain
-      - Windows: Credential Manager
-      - Linux: Secret Service (freedesktop.org)
+    Provider API keys are global and validated against supported providers.
+    Generic secrets can be scoped to specific projects.
     
     Examples:
-        promptv secrets set openai
-        promptv secrets set anthropic
+        # Provider API key
+        promptv secrets set openai --provider
+        promptv secrets set anthropic --provider
+        
+        # Generic secret (uses "default" project)
+        promptv secrets set DATABASE_URL
+        promptv secrets set MY_API_KEY
+        
+        # Project-scoped secret
+        promptv secrets set DATABASE_URL --project my-app
+        promptv secrets set REDIS_URL --project moonshoot
     """
     try:
         manager = SecretsManager()
         
-        # Validate provider
-        if provider not in manager.SUPPORTED_PROVIDERS:
-            click.echo(f"❌ Error: Unsupported provider '{provider}'", err=True)
-            click.echo(f"\nSupported providers:", err=True)
-            for p in manager.SUPPORTED_PROVIDERS:
-                click.echo(f"  - {p}", err=True)
-            sys.exit(1)
-        
-        # Prompt for API key (hidden input)
-        click.echo(f"Setting API key for provider: {provider}")
-        click.echo("\n⚠️  Security Note:")
-        click.echo("   Your API key will be stored locally in ~/.promptv/.secrets/secrets.json")
-        click.echo("   The file has restrictive permissions (owner read/write only).\n")
-        
-        api_key = click.prompt(
-            f"Enter API key for {provider}",
-            hide_input=True,
-            confirmation_prompt=True
-        )
-        
-        # Store the key
-        manager.set_api_key(provider, api_key)
-        click.echo(f"\n✓ API key for '{provider}' stored securely")
+        if provider:
+            # Validate provider
+            if key not in manager.SUPPORTED_PROVIDERS:
+                click.echo(f"❌ Error: Unsupported provider '{key}'", err=True)
+                click.echo(f"\nSupported providers:", err=True)
+                for p in manager.SUPPORTED_PROVIDERS:
+                    click.echo(f"  - {p}", err=True)
+                sys.exit(1)
+            
+            # Prompt for API key (hidden input)
+            click.echo(f"Setting API key for provider: {key}")
+            click.echo("\n⚠️  Security Note:")
+            click.echo("   Your API key will be stored locally in ~/.promptv/.secrets/secrets.json")
+            click.echo("   The file has restrictive permissions (owner read/write only).\n")
+            
+            api_key = click.prompt(
+                f"Enter API key for {key}",
+                hide_input=True,
+                confirmation_prompt=True
+            )
+            
+            # Store the key
+            manager.set_api_key(key, api_key)
+            click.echo(f"\n✓ API key for '{key}' stored securely")
+        else:
+            # Generic secret
+            click.echo(f"Setting secret: {key}")
+            if project != 'default':
+                click.echo(f"Project: {project}")
+            click.echo("\n⚠️  Security Note:")
+            click.echo("   Your secret will be stored locally in ~/.promptv/.secrets/secrets.json")
+            click.echo("   The file has restrictive permissions (owner read/write only).\n")
+            
+            value = click.prompt(
+                f"Enter value for {key}",
+                hide_input=True,
+                confirmation_prompt=True
+            )
+            
+            # Store the secret
+            manager.set_secret(key, value, project=project)
+            click.echo(f"\n✓ Secret '{key}' stored securely")
+            if project != 'default':
+                click.echo(f"  Project: {project}")
         
     except SecretsManagerError as e:
         click.echo(f"\n❌ Secrets Error:\n{e}", err=True)
-        sys.exit(1)
-    except SecretsManagerError as e:
-        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
     except click.Abort:
         click.echo("\nCancelled", err=True)
@@ -733,35 +790,142 @@ def secrets_set(provider):
         sys.exit(1)
 
 
-@secrets.command('list')
-def secrets_list():
+@secrets.command('get')
+@click.argument('key')
+@click.option('--provider', is_flag=True,
+              help='Get provider API key')
+@click.option('--project', default='default',
+              help='Project name for secret scoping (default: "default")')
+def secrets_get(key, provider, project):
     """
-    List all providers with configured API keys.
+    Retrieve a secret or API key.
+    
+    Shows the last 4 characters of provider API keys for security.
+    Generic secrets are displayed in full.
     
     Examples:
-        promptv secrets list
+        # Provider API key
+        promptv secrets get openai --provider
+        promptv secrets get anthropic --provider
+        
+        # Generic secret
+        promptv secrets get DATABASE_URL
+        promptv secrets get API_KEY --project my-app
     """
     try:
         manager = SecretsManager()
-        providers = manager.list_configured_providers()
         
-        if not providers:
-            click.echo("No API keys configured.")
-            click.echo("\nTo add an API key, run:")
-            click.echo("  promptv secrets set <provider>")
-            return
-        
-        click.echo("Configured API keys:\n")
-        for provider in providers:
-            click.echo(f"  ✓ {provider}")
-        
-        click.echo(f"\nTotal: {len(providers)} provider(s)")
+        if provider:
+            # Get provider API key
+            api_key = manager.get_api_key(key)
+            
+            if api_key:
+                # Show masked key (last 4 chars only)
+                if len(api_key) > 4:
+                    masked = f"{'*' * (len(api_key) - 4)}{api_key[-4:]}"
+                else:
+                    masked = "****"
+                
+                click.echo(f"Provider API Key: {key}")
+                click.echo(f"Value: {masked}")
+                click.echo(f"\n(Showing last 4 characters for security)")
+            else:
+                click.echo(f"❌ No API key found for provider '{key}'", err=True)
+                click.echo(f"\nTo add an API key, run:")
+                click.echo(f"  promptv secrets set {key} --provider")
+                sys.exit(1)
+        else:
+            # Get generic secret
+            value = manager.get_secret(key, project=project)
+            
+            if value:
+                click.echo(f"Secret: {key}")
+                if project != 'default':
+                    click.echo(f"Project: {project}")
+                click.echo(f"Value: {value}")
+            else:
+                click.echo(f"❌ No secret found: '{key}'", err=True)
+                if project != 'default':
+                    click.echo(f"   Project: {project}", err=True)
+                click.echo(f"\nTo add a secret, run:")
+                if project != 'default':
+                    click.echo(f"  promptv secrets set {key} --project {project}")
+                else:
+                    click.echo(f"  promptv secrets set {key}")
+                sys.exit(1)
         
     except SecretsManagerError as e:
         click.echo(f"\n❌ Secrets Error:\n{e}", err=True)
         sys.exit(1)
-    except SecretsManagerError as e:
+    except Exception as e:
         click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@secrets.command('list')
+@click.option('--project', 
+              help='Filter by project name (shows all if not specified)')
+def secrets_list(project):
+    """
+    List all configured secrets and API keys.
+    
+    Shows provider API keys and project-scoped secrets grouped by project.
+    
+    Examples:
+        promptv secrets list
+        promptv secrets list --project my-app
+        promptv secrets list --project default
+    """
+    try:
+        manager = SecretsManager()
+        all_secrets = manager.list_all_secrets(project=project)
+        
+        providers = all_secrets.get('providers', [])
+        secrets = all_secrets.get('secrets', {})
+        
+        if not providers and not secrets:
+            if project:
+                click.echo(f"No secrets found for project '{project}'.")
+            else:
+                click.echo("No secrets configured.")
+            click.echo("\nTo add secrets, run:")
+            click.echo("  promptv secrets set <key>                    # Generic secret")
+            click.echo("  promptv secrets set <key> --project <name>   # Project-scoped secret")
+            click.echo("  promptv secrets set <provider> --provider    # Provider API key")
+            return
+        
+        # Display provider API keys
+        if providers:
+            click.echo("Provider API Keys:")
+            for prov in providers:
+                click.echo(f"  ✓ {prov}")
+            click.echo()
+        
+        # Display project secrets
+        if secrets:
+            click.echo("Project Secrets:")
+            for proj_name, keys in secrets.items():
+                click.echo(f"  {proj_name}:")
+                for secret_key in keys:
+                    click.echo(f"    ✓ {secret_key}")
+                click.echo()
+        
+        # Summary
+        total_providers = len(providers)
+        total_secrets = sum(len(keys) for keys in secrets.values())
+        total_projects = len(secrets)
+        
+        parts = []
+        if total_providers:
+            parts.append(f"{total_providers} provider(s)")
+        if total_secrets:
+            parts.append(f"{total_secrets} secret(s) across {total_projects} project(s)")
+        
+        if parts:
+            click.echo(f"Total: {', '.join(parts)}")
+        
+    except SecretsManagerError as e:
+        click.echo(f"\n❌ Secrets Error:\n{e}", err=True)
         sys.exit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -769,39 +933,68 @@ def secrets_list():
 
 
 @secrets.command('delete')
-@click.argument('provider')
+@click.argument('key')
+@click.option('--provider', is_flag=True,
+              help='Delete provider API key')
+@click.option('--project', default='default',
+              help='Project name for secret scoping (default: "default")')
 @click.option('--yes', '-y', is_flag=True, help='Skip confirmation')
-def secrets_delete(provider, yes):
+def secrets_delete(key, provider, project, yes):
     """
-    Delete an API key for a provider.
+    Delete a secret or API key.
     
     Examples:
-        promptv secrets delete openai
-        promptv secrets delete anthropic --yes
+        # Provider API key
+        promptv secrets delete openai --provider
+        promptv secrets delete anthropic --provider --yes
+        
+        # Generic secret
+        promptv secrets delete DATABASE_URL
+        promptv secrets delete API_KEY --project my-app --yes
     """
     try:
         manager = SecretsManager()
         
-        # Check if key exists
-        if not manager.has_api_key(provider):
-            click.echo(f"No API key found for provider '{provider}'")
-            return
-        
-        # Confirm deletion
-        if not yes:
-            click.echo(f"⚠️  About to delete API key for provider: {provider}")
-            if not click.confirm("\nAre you sure?"):
-                click.echo("Cancelled")
+        if provider:
+            # Check if provider key exists
+            if not manager.has_api_key(key):
+                click.echo(f"No API key found for provider '{key}'")
                 return
-        
-        manager.delete_api_key(provider)
-        click.echo(f"✓ API key for '{provider}' deleted")
+            
+            # Confirm deletion
+            if not yes:
+                click.echo(f"⚠️  About to delete API key for provider: {key}")
+                if not click.confirm("\nAre you sure?"):
+                    click.echo("Cancelled")
+                    return
+            
+            manager.delete_api_key(key)
+            click.echo(f"✓ API key for '{key}' deleted")
+        else:
+            # Check if generic secret exists
+            value = manager.get_secret(key, project=project)
+            if not value:
+                click.echo(f"No secret found: '{key}'")
+                if project != 'default':
+                    click.echo(f"  Project: {project}")
+                return
+            
+            # Confirm deletion
+            if not yes:
+                click.echo(f"⚠️  About to delete secret: {key}")
+                if project != 'default':
+                    click.echo(f"   Project: {project}")
+                if not click.confirm("\nAre you sure?"):
+                    click.echo("Cancelled")
+                    return
+            
+            manager.delete_secret(key, project=project)
+            click.echo(f"✓ Secret '{key}' deleted")
+            if project != 'default':
+                click.echo(f"  Project: {project}")
         
     except SecretsManagerError as e:
         click.echo(f"\n❌ Secrets Error:\n{e}", err=True)
-        sys.exit(1)
-    except SecretsManagerError as e:
-        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -837,11 +1030,84 @@ def secrets_test(provider):
     except SecretsManagerError as e:
         click.echo(f"\n❌ Secrets Error:\n{e}", err=True)
         sys.exit(1)
-    except SecretsManagerError as e:
-        click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@secrets.command('activate')
+@click.option('--project', default='default',
+              help='Project name to activate secrets from (default: "default")')
+@click.option('--format', 'output_format', 
+              type=click.Choice(['shell', 'json', 'export'], case_sensitive=False),
+              default='shell',
+              help='Output format: shell (default), json, or export')
+@click.option('--include-providers/--no-include-providers',
+              default=True,
+              help='Include provider API keys (default: True)')
+def secrets_activate(project, output_format, include_providers):
+    """
+    Export secrets as environment variables for shell sourcing.
+    
+    This command outputs shell export statements that can be sourced
+    into your current shell, similar to 'source .env'.
+    
+    Usage:
+        source <(promptv secrets activate --project moonshoot)
+        eval "$(promptv secrets activate --project moonshoot)"
+    
+    Shell Function (add to ~/.bashrc or ~/.zshrc):
+        promptv-activate() {
+            eval "$(promptv secrets activate --project ${1:-default})"
+        }
+        
+        # Then use: promptv-activate moonshoot
+    
+    Examples:
+        # Activate default project
+        source <(promptv secrets activate)
+        
+        # Activate specific project
+        source <(promptv secrets activate --project moonshoot)
+        
+        # Exclude provider API keys
+        source <(promptv secrets activate --project moonshoot --no-include-providers)
+        
+        # JSON output for other tools
+        promptv secrets activate --project moonshoot --format json
+        
+        # Export statements only (no comments)
+        promptv secrets activate --project moonshoot --format export
+    """
+    try:
+        manager = SecretsManager()
+        secrets = manager.get_project_secrets_with_values(
+            project=project,
+            include_providers=include_providers
+        )
+        
+        if not secrets:
+            click.echo(f"# No secrets found for project '{project}'", err=True)
+            return
+        
+        if output_format == 'json':
+            import json
+            click.echo(json.dumps(secrets, indent=2))
+        
+        elif output_format == 'export':
+            for key, value in sorted(secrets.items()):
+                click.echo(f'export {key}="{value}"')
+        
+        else:
+            for key, value in sorted(secrets.items()):
+                click.echo(f'export {key}="{value}"')
+            click.echo(f"# Activated {len(secrets)} secret(s) from project '{project}'")
+        
+    except SecretsManagerError as e:
+        click.echo(f"# Error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"# Error: {e}", err=True)
         sys.exit(1)
 
 
@@ -1217,6 +1483,198 @@ def playground(prompt_name):
         click.echo("\n👋 Playground closed.")
     except Exception as e:
         click.echo(f"Error launching playground: {e}", err=True)
+        sys.exit(1)
+
+
+def initialize_promptv_directory(silent: bool = False) -> dict:
+    """
+    Initialize the ~/.promptv directory structure.
+    
+    Creates required directories and files:
+    - ~/.promptv/
+    - ~/.promptv/.config/ (with config.yaml and pricing.yaml)
+    - ~/.promptv/.secrets/ (with secrets.json)
+    - ~/.promptv/prompts/
+    
+    Args:
+        silent: If True, suppress output messages
+    
+    Returns:
+        Dictionary with creation status for each component
+    """
+    base_dir = Path.home() / ".promptv"
+    config_dir = base_dir / ".config"
+    secrets_dir = base_dir / ".secrets"
+    prompts_dir = base_dir / "prompts"
+    
+    results = {
+        'base_dir_created': False,
+        'config_dir_created': False,
+        'secrets_dir_created': False,
+        'prompts_dir_created': False,
+        'config_yaml_created': False,
+        'pricing_yaml_copied': False,
+        'secrets_json_created': False
+    }
+    
+    try:
+        # Create base directory
+        if not base_dir.exists():
+            base_dir.mkdir(parents=True, exist_ok=True)
+            results['base_dir_created'] = True
+        
+        # Create .config directory
+        if not config_dir.exists():
+            config_dir.mkdir(parents=True, exist_ok=True)
+            results['config_dir_created'] = True
+        
+        # Create .secrets directory with restrictive permissions
+        if not secrets_dir.exists():
+            secrets_dir.mkdir(parents=True, exist_ok=True)
+            secrets_dir.chmod(0o700)
+            results['secrets_dir_created'] = True
+        
+        # Create prompts directory
+        if not prompts_dir.exists():
+            prompts_dir.mkdir(parents=True, exist_ok=True)
+            results['prompts_dir_created'] = True
+        
+        # Initialize config.yaml using ConfigManager
+        config_file = config_dir / "config.yaml"
+        if not config_file.exists():
+            config_mgr = ConfigManager(config_path=config_file)
+            config_mgr.get_config()  # This creates the file if it doesn't exist
+            results['config_yaml_created'] = True
+        
+        # Copy pricing.yaml from package resources
+        pricing_file = config_dir / "pricing.yaml"
+        if not pricing_file.exists():
+            # Get package resource path
+            from .resources import get_pricing_file_path
+            package_pricing = Path(__file__).parent / "resources" / "pricing.yaml"
+            
+            if package_pricing.exists():
+                shutil.copy2(package_pricing, pricing_file)
+                results['pricing_yaml_copied'] = True
+        
+        # Initialize secrets.json using SecretsManager
+        secrets_file = secrets_dir / "secrets.json"
+        if not secrets_file.exists():
+            secrets_mgr = SecretsManager(secrets_dir=secrets_dir)
+            # SecretsManager automatically creates secrets.json on init
+            if secrets_file.exists():
+                secrets_file.chmod(0o600)
+                results['secrets_json_created'] = True
+        
+        return results
+    
+    except Exception as e:
+        if not silent:
+            click.echo(f"Error during initialization: {e}", err=True)
+        raise
+
+
+@cli.command()
+@click.option('--force', is_flag=True, help='Delete existing ~/.promptv and reinitialize (WARNING: destructive!)')
+def init(force):
+    """
+    Initialize promptv directory structure and configuration.
+    
+    Creates the following structure:
+    
+    ~/.promptv/
+    ├── .config/
+    │   ├── config.yaml      # User configuration
+    │   └── pricing.yaml     # LLM pricing data (customizable)
+    ├── .secrets/
+    │   └── secrets.json     # API keys and secrets
+    └── prompts/             # Saved prompts
+    
+    The initialization is idempotent - safe to run multiple times.
+    Use --force to delete and recreate (WARNING: deletes all data).
+    
+    Examples:
+        promptv init
+        promptv init --force
+    """
+    try:
+        base_dir = Path.home() / ".promptv"
+        
+        # Handle force mode
+        if force:
+            if base_dir.exists():
+                click.echo("⚠️  Force mode: This will DELETE all data in ~/.promptv/")
+                click.echo("   Including all prompts, secrets, and configuration!")
+                click.echo()
+                if not click.confirm("Are you absolutely sure?"):
+                    click.echo("Cancelled")
+                    return
+                
+                # Delete existing directory
+                shutil.rmtree(base_dir)
+                click.echo("✓ Removed existing ~/.promptv directory")
+                click.echo()
+        
+        # Initialize directory structure
+        click.echo("Initializing promptv...")
+        results = initialize_promptv_directory(silent=False)
+        
+        # Display results
+        click.echo()
+        click.echo("Directory Structure:")
+        
+        if results['base_dir_created']:
+            click.echo("  ✓ Created ~/.promptv/")
+        else:
+            click.echo("  - ~/.promptv/ (already exists)")
+        
+        if results['config_dir_created']:
+            click.echo("    ✓ Created .config/")
+        else:
+            click.echo("    - .config/ (already exists)")
+        
+        if results['config_yaml_created']:
+            click.echo("      ✓ Created config.yaml")
+        else:
+            click.echo("      - config.yaml (already exists)")
+        
+        if results['pricing_yaml_copied']:
+            click.echo("      ✓ Copied pricing.yaml")
+            pricing_date = get_pricing_data_date()
+            click.echo(f"        Last updated: {pricing_date}")
+        else:
+            click.echo("      - pricing.yaml (already exists)")
+        
+        if results['secrets_dir_created']:
+            click.echo("    ✓ Created .secrets/ (permissions: 0700)")
+        else:
+            click.echo("    - .secrets/ (already exists)")
+        
+        if results['secrets_json_created']:
+            click.echo("      ✓ Created secrets.json (permissions: 0600)")
+        else:
+            click.echo("      - secrets.json (already exists)")
+        
+        if results['prompts_dir_created']:
+            click.echo("    ✓ Created prompts/")
+        else:
+            click.echo("    - prompts/ (already exists)")
+        
+        click.echo()
+        click.echo("✅ Initialization complete!")
+        click.echo()
+        click.echo("Next steps:")
+        click.echo("  1. Set up API keys:")
+        click.echo("     promptv secrets set openai --provider")
+        click.echo()
+        click.echo("  2. Create your first prompt:")
+        click.echo("     promptv set my-prompt -c 'You are a helpful assistant'")
+        click.echo()
+        click.echo("  3. Customize pricing (optional):")
+        click.echo("     Edit ~/.promptv/.config/pricing.yaml")
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
 

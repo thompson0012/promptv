@@ -154,7 +154,86 @@ class TestSecretsManager:
         manager = SecretsManager(secrets_dir=temp_secrets_dir)
         manager.set_api_key("openai", "sk-test")
         
-        # Check file permissions (should be 0o600 - owner read/write only)
         mode = manager.secrets_file.stat().st_mode
         permissions = oct(mode)[-3:]
         assert permissions == "600"
+    
+    def test_get_project_secrets_with_values_default(self, temp_secrets_dir):
+        """Test getting secrets for default project with values."""
+        manager = SecretsManager(secrets_dir=temp_secrets_dir)
+        
+        manager.set_api_key("openai", "sk-openai-key")
+        manager.set_secret("DATABASE_URL", "postgres://localhost/db")
+        manager.set_secret("API_KEY", "abc123")
+        
+        secrets = manager.get_project_secrets_with_values(project="default")
+        
+        assert secrets["OPENAI_API_KEY"] == "sk-openai-key"
+        assert secrets["DATABASE_URL"] == "postgres://localhost/db"
+        assert secrets["API_KEY"] == "abc123"
+        assert len(secrets) == 3
+    
+    def test_get_project_secrets_with_values_specific_project(self, temp_secrets_dir):
+        """Test getting secrets for specific project with values."""
+        manager = SecretsManager(secrets_dir=temp_secrets_dir)
+        
+        manager.set_api_key("openai", "sk-openai-key")
+        manager.set_secret("DATABASE_URL", "postgres://db1", project="app1")
+        manager.set_secret("REDIS_URL", "redis://localhost", project="app1")
+        manager.set_secret("API_KEY", "xyz789", project="app2")
+        
+        secrets = manager.get_project_secrets_with_values(project="app1")
+        
+        assert secrets["OPENAI_API_KEY"] == "sk-openai-key"
+        assert secrets["DATABASE_URL"] == "postgres://db1"
+        assert secrets["REDIS_URL"] == "redis://localhost"
+        assert "API_KEY" not in secrets
+        assert len(secrets) == 3
+    
+    def test_get_project_secrets_with_values_no_providers(self, temp_secrets_dir):
+        """Test getting secrets without provider API keys."""
+        manager = SecretsManager(secrets_dir=temp_secrets_dir)
+        
+        manager.set_api_key("openai", "sk-openai-key")
+        manager.set_api_key("anthropic", "sk-ant-key")
+        manager.set_secret("DATABASE_URL", "postgres://localhost/db")
+        
+        secrets = manager.get_project_secrets_with_values(
+            project="default", 
+            include_providers=False
+        )
+        
+        assert "OPENAI_API_KEY" not in secrets
+        assert "ANTHROPIC_API_KEY" not in secrets
+        assert secrets["DATABASE_URL"] == "postgres://localhost/db"
+        assert len(secrets) == 1
+    
+    def test_get_project_secrets_with_values_empty_project(self, temp_secrets_dir):
+        """Test getting secrets for project with no secrets."""
+        manager = SecretsManager(secrets_dir=temp_secrets_dir)
+        
+        manager.set_secret("DATABASE_URL", "postgres://db", project="app1")
+        
+        secrets = manager.get_project_secrets_with_values(
+            project="app2", 
+            include_providers=False
+        )
+        
+        assert len(secrets) == 0
+    
+    def test_get_project_secrets_with_values_provider_name_format(self, temp_secrets_dir):
+        """Test that provider keys are formatted correctly as env vars."""
+        manager = SecretsManager(secrets_dir=temp_secrets_dir)
+        
+        manager.set_api_key("openai", "sk-test")
+        manager.set_api_key("anthropic", "sk-ant-test")
+        manager.set_api_key("google", "google-key")
+        
+        secrets = manager.get_project_secrets_with_values(project="default")
+        
+        assert "OPENAI_API_KEY" in secrets
+        assert "ANTHROPIC_API_KEY" in secrets
+        assert "GOOGLE_API_KEY" in secrets
+        assert secrets["OPENAI_API_KEY"] == "sk-test"
+        assert secrets["ANTHROPIC_API_KEY"] == "sk-ant-test"
+        assert secrets["GOOGLE_API_KEY"] == "google-key"

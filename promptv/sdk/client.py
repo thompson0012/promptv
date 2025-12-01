@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from ..manager import PromptManager
 from ..tag_manager import TagManager
 from ..variable_engine import VariableEngine
+from ..secrets_manager import SecretsManager
 from ..models import VersionMetadata, PromptMetadata, CostEstimate
 from ..exceptions import PromptNotFoundError, TagNotFoundError
 from ..cost_estimator import CostEstimator
@@ -38,10 +39,13 @@ class PromptClient:
     SDK client for programmatic prompt access.
     
     This client provides a simple API for retrieving and rendering prompts
-    programmatically with built-in caching and variable interpolation.
+    programmatically with built-in caching, variable interpolation, and 
+    secrets management.
     
     Examples:
         >>> client = PromptClient()
+        
+        # Prompt management
         >>> prompt = client.get_prompt('onboarding-email', label='prod')
         >>> 
         >>> # With variables
@@ -50,6 +54,11 @@ class PromptClient:
         ...     label='prod',
         ...     variables={'name': 'Alice', 'product': 'promptv'}
         ... )
+        >>> 
+        >>> # Secrets management
+        >>> client.set_api_key("openai", "sk-...")
+        >>> client.set_secret("DATABASE_URL", "postgres://...", project="my-app")
+        >>> db_url = client.get_secret("DATABASE_URL", project="my-app")
         >>> 
         >>> # With context manager
         >>> with PromptClient() as client:
@@ -74,6 +83,10 @@ class PromptClient:
         self.tag_manager = TagManager(self.manager.prompts_dir)
         self.variable_engine = VariableEngine()
         self.cache: Dict[str, CachedPrompt] = {}
+        
+        # Initialize SecretsManager for secrets management
+        secrets_dir = self.base_dir / ".secrets" if base_dir else None
+        self.secrets_manager = SecretsManager(secrets_dir=secrets_dir)
         
         logger.debug(f"Initialized PromptClient with base_dir={self.base_dir}, cache_ttl={cache_ttl}")
     
@@ -531,3 +544,150 @@ class PromptClient:
         """Context manager exit - cleanup cache."""
         self.clear_cache()
         return False
+    
+    # Secrets Management Methods - Provider API Keys
+    
+    def set_api_key(self, provider: str, api_key: str) -> None:
+        """
+        Store an API key for a provider.
+        
+        Args:
+            provider: Provider name (e.g., "openai", "anthropic")
+            api_key: API key to store
+            
+        Raises:
+            ValueError: If provider is not supported
+            
+        Examples:
+            >>> client = PromptClient()
+            >>> client.set_api_key("openai", "sk-...")
+        """
+        self.secrets_manager.set_api_key(provider, api_key)
+    
+    def get_api_key(self, provider: str) -> Optional[str]:
+        """
+        Retrieve an API key for a provider.
+        
+        Args:
+            provider: Provider name (e.g., "openai", "anthropic")
+            
+        Returns:
+            API key if found, None otherwise
+            
+        Examples:
+            >>> client = PromptClient()
+            >>> api_key = client.get_api_key("openai")
+            >>> if api_key:
+            ...     print("OpenAI key configured")
+        """
+        return self.secrets_manager.get_api_key(provider)
+    
+    def has_api_key(self, provider: str) -> bool:
+        """
+        Check if an API key exists for a provider.
+        
+        Args:
+            provider: Provider name (e.g., "openai", "anthropic")
+            
+        Returns:
+            True if API key exists, False otherwise
+            
+        Examples:
+            >>> client = PromptClient()
+            >>> if client.has_api_key("openai"):
+            ...     print("OpenAI configured")
+        """
+        return self.secrets_manager.has_api_key(provider)
+    
+    def delete_api_key(self, provider: str) -> None:
+        """
+        Delete an API key for a provider.
+        
+        Args:
+            provider: Provider name (e.g., "openai", "anthropic")
+            
+        Examples:
+            >>> client = PromptClient()
+            >>> client.delete_api_key("openai")
+        """
+        self.secrets_manager.delete_api_key(provider)
+    
+    # Secrets Management Methods - Generic Secrets
+    
+    def set_secret(self, key_name: str, value: str, project: Optional[str] = None) -> None:
+        """
+        Store a generic secret (non-provider API key).
+        
+        Args:
+            key_name: Name of the secret
+            value: Secret value
+            project: Optional project name for scoping (default: None)
+        
+        Examples:
+            >>> client = PromptClient()
+            >>> client.set_secret("DATABASE_URL", "postgres://...")
+            >>> client.set_secret("API_KEY", "abc123", project="my-app")
+        """
+        self.secrets_manager.set_secret(key_name, value, project=project)
+    
+    def get_secret(self, key_name: str, project: Optional[str] = None) -> Optional[str]:
+        """
+        Retrieve a generic secret.
+        
+        Args:
+            key_name: Name of the secret
+            project: Optional project name for scoping
+        
+        Returns:
+            Secret value if found, None otherwise
+        
+        Examples:
+            >>> client = PromptClient()
+            >>> db_url = client.get_secret("DATABASE_URL")
+            >>> api_key = client.get_secret("API_KEY", project="my-app")
+        """
+        return self.secrets_manager.get_secret(key_name, project=project)
+    
+    def delete_secret(self, key_name: str, project: Optional[str] = None) -> None:
+        """
+        Delete a generic secret.
+        
+        Args:
+            key_name: Name of the secret
+            project: Optional project name for scoping
+        
+        Examples:
+            >>> client = PromptClient()
+            >>> client.delete_secret("DATABASE_URL")
+            >>> client.delete_secret("API_KEY", project="my-app")
+        """
+        self.secrets_manager.delete_secret(key_name, project=project)
+    
+    def list_secrets(self, project: Optional[str] = None) -> Dict[str, Any]:
+        """
+        List all secrets grouped by type and project.
+        
+        Args:
+            project: Optional project filter
+        
+        Returns:
+            Dictionary with the format:
+            {
+                "providers": ["openai", "anthropic"],
+                "secrets": {
+                    "default": ["DATABASE_URL", "API_KEY"],
+                    "my-app": ["DB_PASSWORD", "REDIS_URL"]
+                }
+            }
+        
+        Examples:
+            >>> client = PromptClient()
+            >>> all_secrets = client.list_secrets()
+            >>> print(f"Providers: {all_secrets['providers']}")
+            >>> for proj, keys in all_secrets['secrets'].items():
+            ...     print(f"{proj}: {keys}")
+            
+            >>> # Filter by project
+            >>> app_secrets = client.list_secrets(project="my-app")
+        """
+        return self.secrets_manager.list_all_secrets(project=project)

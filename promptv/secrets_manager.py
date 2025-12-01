@@ -7,7 +7,7 @@ LLM providers using encrypted local file storage in ~/.promptv/.secrets
 
 import json
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import logging
 
 from .exceptions import PromptVError
@@ -25,15 +25,24 @@ class SecretsManager:
     Manages storage of API keys using local file storage.
     
     This class provides an interface for storing, retrieving, and managing
-    API keys for various LLM providers. Keys are stored in plaintext JSON
-    in ~/.promptv/.secrets/secrets.json with restrictive file permissions.
+    API keys for various LLM providers, as well as generic project-scoped secrets.
+    Keys are stored in plaintext JSON in ~/.promptv/.secrets/secrets.json 
+    with restrictive file permissions.
     
     Examples:
         >>> manager = SecretsManager()
+        
+        # Provider API keys
         >>> manager.set_api_key("openai", "sk-...")
         >>> api_key = manager.get_api_key("openai")
         >>> providers = manager.list_configured_providers()
         >>> manager.delete_api_key("openai")
+        
+        # Generic secrets with project scoping
+        >>> manager.set_secret("DATABASE_URL", "postgres://...", project="my-app")
+        >>> db_url = manager.get_secret("DATABASE_URL", project="my-app")
+        >>> all_secrets = manager.list_all_secrets()
+        >>> manager.delete_secret("DATABASE_URL", project="my-app")
     """
     
     SERVICE_NAME = "promptv"
@@ -406,3 +415,133 @@ class SecretsManager:
             return self.get_api_key(provider) is not None
         except SecretsManagerError:
             return False
+    
+    def is_provider_key(self, key_name: str) -> bool:
+        """
+        Check if a key name matches a supported provider.
+        
+        Args:
+            key_name: The key name to check
+            
+        Returns:
+            True if the key name is a supported provider, False otherwise
+            
+        Examples:
+            >>> manager = SecretsManager()
+            >>> manager.is_provider_key("openai")
+            True
+            >>> manager.is_provider_key("MY_API_KEY")
+            False
+        """
+        return key_name in self.SUPPORTED_PROVIDERS
+    
+    def list_all_secrets(self, project: Optional[str] = None) -> Dict[str, Any]:
+        """
+        List all secrets grouped by type and project.
+        
+        Args:
+            project: Optional project filter to show only secrets for that project
+            
+        Returns:
+            Dictionary with the format:
+            {
+                "providers": ["openai", "anthropic"],
+                "secrets": {
+                    "default": ["DATABASE_URL", "API_KEY"],
+                    "my-app": ["DB_PASSWORD", "REDIS_URL"]
+                }
+            }
+            
+        Examples:
+            >>> manager = SecretsManager()
+            >>> all_secrets = manager.list_all_secrets()
+            >>> print(f"Providers: {all_secrets['providers']}")
+            >>> for proj, keys in all_secrets['secrets'].items():
+            ...     print(f"{proj}: {keys}")
+            
+            >>> # Filter by project
+            >>> app_secrets = manager.list_all_secrets(project="my-app")
+            >>> print(app_secrets['secrets']['my-app'])
+        """
+        secrets = self._load_secrets()
+        providers = []
+        project_secrets: Dict[str, List[str]] = {}
+        
+        for key, value in secrets.items():
+            if self.is_provider_key(key):
+                # This is a provider API key
+                providers.append(key)
+            elif "::" in key:
+                # This is a project-scoped secret
+                proj_name, secret_name = key.split("::", 1)
+                
+                # Apply project filter if specified
+                if project and proj_name != project:
+                    continue
+                
+                if proj_name not in project_secrets:
+                    project_secrets[proj_name] = []
+                project_secrets[proj_name].append(secret_name)
+            else:
+                # This is a non-scoped secret (treat as "default" project)
+                proj_name = "default"
+                
+                # Apply project filter if specified
+                if project and proj_name != project:
+                    continue
+                
+                if proj_name not in project_secrets:
+                    project_secrets[proj_name] = []
+                project_secrets[proj_name].append(key)
+        
+        return {
+            "providers": sorted(providers),
+            "secrets": {k: sorted(v) for k, v in sorted(project_secrets.items())}
+        }
+    
+    def get_project_secrets_with_values(
+        self, 
+        project: Optional[str] = None, 
+        include_providers: bool = True
+    ) -> Dict[str, str]:
+        """
+        Get all secrets for a project with their actual values.
+        
+        This is useful for exporting secrets to environment variables.
+        
+        Args:
+            project: Project name to filter (default: "default")
+            include_providers: Whether to include provider API keys (default: True)
+            
+        Returns:
+            Dictionary mapping environment variable names to their values
+            
+        Examples:
+            >>> manager = SecretsManager()
+            >>> secrets = manager.get_project_secrets_with_values(project="moonshoot")
+            >>> for key, value in secrets.items():
+            ...     print(f"export {key}={value}")
+        """
+        if project is None:
+            project = "default"
+        
+        secrets = self._load_secrets()
+        result = {}
+        
+        for key, value in secrets.items():
+            if self.is_provider_key(key):
+                if include_providers:
+                    # Convert provider key to env var format (e.g., openai -> OPENAI_API_KEY)
+                    env_var_name = f"{key.upper()}_API_KEY"
+                    result[env_var_name] = value
+            elif "::" in key:
+                # Project-scoped secret
+                proj_name, secret_name = key.split("::", 1)
+                if proj_name == project:
+                    result[secret_name] = value
+            else:
+                # Non-scoped secret (belongs to "default" project)
+                if project == "default":
+                    result[key] = value
+        
+        return result
