@@ -30,7 +30,7 @@ from .playground.app import run_playground
 
 
 @click.group()
-@click.version_option(version='0.1.3')
+@click.version_option(version='0.1.4')
 @click.pass_context
 def cli(ctx):
     """
@@ -1549,13 +1549,17 @@ def initialize_promptv_directory(silent: bool = False) -> dict:
         # Copy pricing.yaml from package resources
         pricing_file = config_dir / "pricing.yaml"
         if not pricing_file.exists():
-            # Get package resource path
-            from .resources import get_pricing_file_path
-            package_pricing = Path(__file__).parent / "resources" / "pricing.yaml"
+            # Get package resource path (absolute path)
+            import promptv
+            package_dir = Path(promptv.__file__).parent
+            package_pricing = package_dir / "resources" / "pricing.yaml"
             
             if package_pricing.exists():
                 shutil.copy2(package_pricing, pricing_file)
                 results['pricing_yaml_copied'] = True
+            else:
+                if not silent:
+                    click.echo(f"Warning: Could not find pricing.yaml in package resources at {package_pricing}", err=True)
         
         # Initialize secrets.json using SecretsManager
         secrets_file = secrets_dir / "secrets.json"
