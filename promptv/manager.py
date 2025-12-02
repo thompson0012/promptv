@@ -148,15 +148,13 @@ class PromptManager:
             description=None
         )
     
-    def _save_metadata(self, metadata: PromptMetadata):
+    def _save_metadata(self, metadata: PromptMetadata, project: Optional[str] = None):
         """Save metadata for a prompt."""
-        metadata_file = self._get_metadata_file(metadata.name)
+        metadata_file = self._get_metadata_file(metadata.name, project=project)
         metadata_file.parent.mkdir(parents=True, exist_ok=True)
         
-        # Convert to dict and then to JSON
         data = metadata.model_dump(mode='json')
         
-        # Convert datetime objects to ISO format strings
         data["created_at"] = metadata.created_at.isoformat()
         data["updated_at"] = metadata.updated_at.isoformat()
         
@@ -281,13 +279,10 @@ class PromptManager:
         with open(prompt_file, 'w') as f:
             f.write(content)
         
-        # Extract variables
         variables = self.extract_variables(content)
         
-        # Count tokens
         token_count = self.count_tokens(content)
         
-        # Create version metadata
         now = datetime.now()
         version_info = VersionMetadata(
             version=version,
@@ -299,14 +294,13 @@ class PromptManager:
             token_count=token_count
         )
         
-        # Update prompt metadata
         metadata.versions.append(version_info)
         metadata.current_version = version
         metadata.updated_at = now
         if not metadata.versions or version == 1:
             metadata.created_at = now
         
-        self._save_metadata(metadata)
+        self._save_metadata(metadata, project=project)
         
         return {
             "name": name,
@@ -351,7 +345,6 @@ class PromptManager:
         # Count tokens
         token_count = self.count_tokens(content)
         
-        # Create version metadata
         now = datetime.now()
         version_info = VersionMetadata(
             version=version,
@@ -363,14 +356,13 @@ class PromptManager:
             token_count=token_count
         )
         
-        # Update prompt metadata
         metadata.versions.append(version_info)
         metadata.current_version = version
         metadata.updated_at = now
         if not metadata.versions or version == 1:
             metadata.created_at = now
         
-        self._save_metadata(metadata)
+        self._save_metadata(metadata, project=project)
         
         return {
             "name": name,

@@ -167,18 +167,17 @@ class TestPhase1Integration:
         
     def test_list_with_show_tags(self, runner, isolated_promptv, tmp_path):
         """Test list command with --show-tags flag."""
-        # Create prompt and tag
         prompt_file = tmp_path / "list_test.md"
         prompt_file.write_text("List test content")
         
-        runner.invoke(cli, [
+        result = runner.invoke(cli, [
             'commit',
             '--source', str(prompt_file),
             '--name', 'list-test',
             '--tag', 'v1.0'
         ])
+        assert result.exit_code == 0, f"Commit failed: {result.output}"
         
-        # List with tags
         result = runner.invoke(cli, [
             'list',
             'list-test',
@@ -190,17 +189,16 @@ class TestPhase1Integration:
         
     def test_list_with_show_variables(self, runner, isolated_promptv, tmp_path):
         """Test list command with --show-variables flag."""
-        # Create prompt with variables
         prompt_file = tmp_path / "vars.md"
         prompt_file.write_text("Hello {{name}}, your score is {{score}}")
         
-        runner.invoke(cli, [
+        result = runner.invoke(cli, [
             'commit',
             '--source', str(prompt_file),
             '--name', 'var-test'
         ])
+        assert result.exit_code == 0, f"Commit failed: {result.output}"
         
-        # List with variables
         result = runner.invoke(cli, [
             'list',
             'var-test',
@@ -213,19 +211,18 @@ class TestPhase1Integration:
         
     def test_variables_list_command(self, runner, isolated_promptv, tmp_path):
         """Test variables list command."""
-        # Create prompt with variables
         prompt_file = tmp_path / "multi_var.md"
         prompt_file.write_text("Template with {{var1}}, {{var2}}, and {{var3}}")
         
-        runner.invoke(cli, [
+        result = runner.invoke(cli, [
             'commit',
             '--source', str(prompt_file),
             '--name', 'multi-var'
         ])
+        assert result.exit_code == 0, f"Commit failed: {result.output}"
         
-        # List variables
         result = runner.invoke(cli, ['variables', 'list', 'multi-var'])
-        assert result.exit_code == 0
+        assert result.exit_code == 0, f"Variables list failed: {result.output}"
         assert "var1" in result.output
         assert "var2" in result.output
         assert "var3" in result.output
@@ -335,23 +332,23 @@ class TestPhase1Integration:
         
     def test_list_all_prompts(self, runner, isolated_promptv, tmp_path):
         """Test listing all prompts without specifying name."""
-        # Create multiple prompts
         for i in range(3):
             prompt_file = tmp_path / f"prompt{i}.md"
             prompt_file.write_text(f"Content {i}")
-            runner.invoke(cli, [
+            result = runner.invoke(cli, [
                 'commit',
                 '--source', str(prompt_file),
                 '--name', f'prompt-{i}'
             ])
+            assert result.exit_code == 0, f"Commit failed: {result.output}"
         
-        # List all
         result = runner.invoke(cli, ['list'])
         assert result.exit_code == 0
         assert "Found 3 prompt(s)" in result.output
-        assert "prompt-0" in result.output
-        assert "prompt-1" in result.output
-        assert "prompt-2" in result.output
+        assert "default/" in result.output
+        assert "prompt-0 (v1, 1 version(s))" in result.output
+        assert "prompt-1 (v1, 1 version(s))" in result.output
+        assert "prompt-2 (v1, 1 version(s))" in result.output
 
 
 class TestBackwardCompatibility:

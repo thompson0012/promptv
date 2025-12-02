@@ -340,7 +340,7 @@ def get(name, version, label, var, project):
 @click.argument('name', required=False)
 @click.option('--show-tags', is_flag=True, help='Show tags for each prompt')
 @click.option('--show-variables', is_flag=True, help='Show variables for each version')
-@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+@click.option('--project', default=None, help='Filter by project name (default: show all projects)')
 def list_command(name, show_tags, show_variables, project):
     """
     List all versions and metadata for a specific prompt name.
@@ -352,26 +352,26 @@ def list_command(name, show_tags, show_variables, project):
         promptv list my-prompt --show-tags
         promptv list my-prompt --show-variables
         promptv list --project my-app
+        promptv list my-prompt --project my-app
     """
     try:
         manager = PromptManager()
         tag_manager = TagManager(manager.prompts_dir)
         
         if name:
-            # List specific prompt
-            metadata = manager.list_versions(name, project=project)
+            prompt_project = project if project else 'default'
+            metadata = manager.list_versions(name, project=prompt_project)
             
             if metadata is None:
                 click.echo(f"Error: Prompt '{name}' not found", err=True)
                 sys.exit(1)
             
             click.echo(f"Prompt: {metadata['name']}")
-            click.echo(f"Project: {project}")
+            click.echo(f"Project: {prompt_project}")
             click.echo(f"Total versions: {len(metadata['versions'])}")
             
-            # Show tags if requested
             if show_tags:
-                tags = tag_manager.list_tags(name, project=project)
+                tags = tag_manager.list_tags(name, project=prompt_project)
                 if tags:
                     click.echo(f"\nTags:")
                     for tag_name, tag_obj in tags.items():
@@ -393,33 +393,88 @@ def list_command(name, show_tags, show_variables, project):
                 if show_variables and version_info.get('variables'):
                     click.echo(f"    Variables: {', '.join(version_info['variables'])}")
         else:
-            # List all prompts
             prompts_dir = manager.prompts_dir
             if not prompts_dir.exists():
                 click.echo("No prompts found")
                 return
             
-            prompt_dirs = [d for d in prompts_dir.iterdir() if d.is_dir() and not d.name.startswith('.')]
+            all_dirs = [d for d in prompts_dir.iterdir() if d.is_dir() and not d.name.startswith('.')]
             
-            if not prompt_dirs:
+            if not all_dirs:
                 click.echo("No prompts found")
                 return
             
-            click.echo(f"Found {len(prompt_dirs)} prompt(s):\n")
+            project_dirs = []
+            root_level_prompts = []
             
-            for prompt_dir in sorted(prompt_dirs, key=lambda p: p.name):
-                prompt_name = prompt_dir.name
-                metadata = manager.list_versions(prompt_name)
-                if metadata:
-                    version_count = len(metadata['versions'])
-                    current_ver = metadata['versions'][-1]['version'] if metadata['versions'] else 0
-                    click.echo(f"  {prompt_name} (v{current_ver}, {version_count} version(s))")
-                    
-                    if show_tags:
-                        tags = tag_manager.list_tags(prompt_name)
-                        if tags:
-                            tag_list = [f"{tn}→v{to.version}" for tn, to in tags.items()]
-                            click.echo(f"    Tags: {', '.join(tag_list)}")
+            for d in all_dirs:
+                metadata_file = d / "metadata.json"
+                if metadata_file.exists():
+                    root_level_prompts.append(d)
+                else:
+                    project_dirs.append(d)
+            
+            if project:
+                project_dirs = [d for d in project_dirs if d.name == project]
+                if not project_dirs and project not in [p.name for p in root_level_prompts]:
+                    click.echo(f"No prompts found in project '{project}'")
+                    return
+            
+            total_prompts = 0
+            projects_data = {}
+            
+            if not project:
+                for prompt_dir in sorted(root_level_prompts, key=lambda p: p.name):
+                    prompt_name = prompt_dir.name
+                    metadata = manager.list_versions(prompt_name, project=None)
+                    if metadata and metadata['versions']:
+                        if '(root)' not in projects_data:
+                            projects_data['(root)'] = []
+                        version_count = len(metadata['versions'])
+                        current_ver = metadata['versions'][-1]['version']
+                        projects_data['(root)'].append({
+                            'name': prompt_name,
+                            'version': current_ver,
+                            'count': version_count
+                        })
+                        total_prompts += 1
+            
+            for project_dir in sorted(project_dirs, key=lambda p: p.name):
+                project_name = project_dir.name
+                
+                prompt_dirs = [d for d in project_dir.iterdir() if d.is_dir() and not d.name.startswith('.')]
+                for prompt_dir in sorted(prompt_dirs, key=lambda p: p.name):
+                    prompt_name = prompt_dir.name
+                    metadata = manager.list_versions(prompt_name, project=project_name)
+                    if metadata and metadata['versions']:
+                        if project_name not in projects_data:
+                            projects_data[project_name] = []
+                        version_count = len(metadata['versions'])
+                        current_ver = metadata['versions'][-1]['version']
+                        projects_data[project_name].append({
+                            'name': prompt_name,
+                            'version': current_ver,
+                            'count': version_count
+                        })
+                        total_prompts += 1
+            
+            if total_prompts == 0:
+                click.echo("No prompts found")
+                return
+            
+            if project:
+                click.echo(f"Found {total_prompts} prompt(s) in project '{project}':\n")
+            else:
+                click.echo(f"Found {total_prompts} prompt(s):\n")
+            
+            for project_name, prompts in projects_data.items():
+                if prompts:
+                    click.echo(f"{project_name}/")
+                    for i, prompt_info in enumerate(prompts):
+                        is_last = i == len(prompts) - 1
+                        prefix = "└──" if is_last else "├──"
+                        click.echo(f"  {prefix} {prompt_info['name']} (v{prompt_info['version']}, {prompt_info['count']} version(s))")
+                    click.echo("")
                         
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -679,7 +734,8 @@ def tag_delete(prompt_name, tag_name, yes, project):
 @click.option('--version', help='Version to render (default: latest)')
 @click.option('--label', help='Tag/label to render')
 @click.option('--var', multiple=True, required=True, help='Variable substitution (key=value)')
-def render(prompt_name, version, label, var):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def render(prompt_name, version, label, var, project):
     """
     Render a prompt with variable substitution.
     
@@ -687,31 +743,30 @@ def render(prompt_name, version, label, var):
         promptv render my-prompt --var name=Alice --var count=5
         promptv render my-prompt --label prod --var api_key=sk-xxx
         promptv render my-prompt --version 2 --var temperature=0.7
+        promptv render my-prompt --project my-app --var name=Bob
     """
     try:
         manager = PromptManager()
         tag_manager = TagManager(manager.prompts_dir)
         var_engine = VariableEngine()
         
-        # Determine which version to get
         if label and version:
             click.echo("Error: Cannot specify both --version and --label", err=True)
             sys.exit(1)
         
-        # Resolve version reference
         if label:
-            metadata = manager._load_metadata(prompt_name)
+            metadata = manager._load_metadata(prompt_name, project=project)
             if not metadata.versions:
                 raise PromptNotFoundError(prompt_name)
             max_version = metadata.current_version
-            version_num = tag_manager.resolve_version(prompt_name, label, max_version)
+            version_num = tag_manager.resolve_version(prompt_name, label, max_version, project=project)
             version_ref = str(version_num)
         elif version:
             version_ref = version
         else:
             version_ref = "latest"
         
-        content = manager.get_prompt(prompt_name, version_ref)
+        content = manager.get_prompt(prompt_name, version_ref, project=project)
         
         if content is None:
             raise PromptNotFoundError(prompt_name)
@@ -756,20 +811,22 @@ def variables():
 @variables.command('list')
 @click.argument('prompt_name')
 @click.option('--version', help='Version to inspect (default: latest)')
-def variables_list(prompt_name, version):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def variables_list(prompt_name, version, project):
     """
     List all variables in a prompt.
     
     Examples:
         promptv variables list my-prompt
         promptv variables list my-prompt --version 2
+        promptv variables list my-prompt --project my-app
     """
     try:
         manager = PromptManager()
         var_engine = VariableEngine()
         
         version_ref = version if version else "latest"
-        content = manager.get_prompt(prompt_name, version_ref)
+        content = manager.get_prompt(prompt_name, version_ref, project=project)
         
         if content is None:
             raise PromptNotFoundError(prompt_name)
