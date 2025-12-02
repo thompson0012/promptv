@@ -20,7 +20,7 @@ class ConfigManager:
     Manage promptv configuration.
     
     Handles loading, saving, and accessing user configuration settings
-    for cache, cost estimation, and playground preferences.
+    for cache and cost estimation.
     
     Example:
         >>> config_mgr = ConfigManager()
@@ -55,12 +55,6 @@ cost_estimation:
   default_output_tokens: 500
   default_model: "gpt-4"
   default_provider: "openai"
-
-# Playground TUI settings
-playground:
-  default_provider: "openai"
-  default_model: "gpt-4"
-  show_cost_estimate: true
 
 # LLM Provider API configurations
 llm_providers:

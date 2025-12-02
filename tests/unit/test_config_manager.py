@@ -206,7 +206,6 @@ class TestConfigManager:
         data = yaml.safe_load(content)
         assert "cache" in data
         assert "cost_estimation" in data
-        assert "playground" in data
     
     def test_config_persistence_across_instances(self, temp_config_dir):
         """Test that config changes persist across manager instances."""

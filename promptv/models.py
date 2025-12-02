@@ -87,13 +87,6 @@ class CostEstimationConfig(BaseModel):
     default_provider: str = "openai"
 
 
-class PlaygroundConfig(BaseModel):
-    """Playground TUI configuration."""
-    default_provider: str = "openai"
-    default_model: str = "gpt-4"
-    show_cost_estimate: bool = True
-
-
 class LLMProviderConfig(BaseModel):
     """LLM provider API configuration."""
     api_base_url: str
@@ -158,5 +151,4 @@ class Config(BaseModel):
     execution: ExecutionMode = Field(default_factory=ExecutionMode)
     cache: CacheConfig = Field(default_factory=CacheConfig)
     cost_estimation: CostEstimationConfig = Field(default_factory=CostEstimationConfig)
-    playground: PlaygroundConfig = Field(default_factory=PlaygroundConfig)
     llm_providers: LLMProvidersConfig = Field(default_factory=LLMProvidersConfig)

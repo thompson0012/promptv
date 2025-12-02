@@ -25,7 +25,6 @@ A command-line interface tool for managing prompts locally with versioning suppo
 - Variable substitution with Jinja2 templates
 - Tag/label system for easy version references
 - Cost estimation for LLM API calls
-- Interactive playground TUI
 - API testing with LLM integration
 - Project-based organization for prompts and secrets
 - Git-style diff visualization
@@ -121,20 +120,31 @@ The file is copied from package resources during initialization and never auto-u
 1. **commit** - Save a prompt file with a specific name
 
    ```bash
-   promptv commit --source file.md --name prompt-name
+   promptv commit --source file.md --name prompt-name                    # Saves to /default project
    promptv commit --source file.md --name prompt-name -m "Update message"
    promptv commit --source file.md --name prompt-name --tag prod
+   promptv commit --source file.md --name prompt-name --project my-app   # Saves to /my-app project
    ```
 
 2. **set** - Set/update a prompt with the given name
 
    ```bash
-   promptv set prompt-name --file file.txt
+   promptv set prompt-name --file file.txt                 # Saves to /default project
    promptv set prompt-name --content "Prompt content"
    echo "Content" | promptv set prompt-name
+   promptv set prompt-name --file file.txt --project my-app  # Saves to /my-app project
    ```
 
-3. **get** - Retrieve a specific version of a prompt
+3. **edit** - Edit a prompt directly in your terminal editor
+
+   ```bash
+   promptv edit prompt-name
+   promptv edit prompt-name --version 2
+   promptv edit prompt-name -m "Updated instructions"
+   promptv edit prompt-name --editor vim
+   ```
+
+4. **get** - Retrieve a specific version of a prompt
 
    ```bash
    promptv get prompt-name --version latest
@@ -148,13 +158,13 @@ The file is copied from package resources during initialization and never auto-u
    promptv get prompt-name --var key1=val1 --var key2=val2
    ```
 
-4. **list** - List all versions and metadata for a prompt
+5. **list** - List all versions and metadata for a prompt
 
    ```bash
    promptv list prompt-name
    ```
 
-5. **remove** - Remove one or more prompts
+6. **remove** - Remove one or more prompts
 
    ```bash
    promptv remove prompt-name
@@ -162,15 +172,19 @@ The file is copied from package resources during initialization and never auto-u
    promptv remove prompt-name --yes  # Skip confirmation
    ```
 
-6. **tags** - Manage tags/labels for versions
+7. **tags** - Manage tags/labels for versions
 
    ```bash
-   promptv tags create prompt-name tag-name --version 1
-   promptv tags list prompt-name
-   promptv tags delete prompt-name tag-name
+   promptv tag create prompt-name tag-name --version 1
+   promptv tag create prompt-name tag-name --project my-app
+   promptv tag list prompt-name
+   promptv tag list prompt-name --project my-app
+   promptv tag show prompt-name tag-name --project my-app
+   promptv tag delete prompt-name tag-name
+   promptv tag delete prompt-name tag-name --project my-app
    ```
 
-7. **secrets** - Manage API keys and secrets securely
+8. **secrets** - Manage API keys and secrets securely
 
    ```bash
    # Set provider API key (validated against supported providers)
@@ -203,7 +217,7 @@ The file is copied from package resources during initialization and never auto-u
    eval "$(promptv secrets activate --project moonshoot)"
    ```
 
-8. **diff** - Compare two versions of a prompt
+9. **diff** - Compare two versions of a prompt
 
    ```bash
    promptv diff prompt-name v1 v2
@@ -212,19 +226,12 @@ The file is copied from package resources during initialization and never auto-u
    promptv diff prompt-name v1 v2 --format side-by-side  # Shows --, ++, ~~ markers
    ```
 
-9. **estimate-cost** - Estimate cost of running a prompt
+10. **estimate-cost** - Estimate cost of running a prompt
 
    ```bash
    promptv estimate-cost prompt-name --model gpt-4 --provider openai
    promptv estimate-cost prompt-name --output-tokens 1000
    ```
-
-10. **playground** - Launch interactive TUI for testing prompts
-
-    ```bash
-    promptv playground
-    promptv playground --prompt prompt-name
-    ```
 
 11. **test** - Run API tests with LLM integration
     ```bash
@@ -353,6 +360,20 @@ promptv secrets activate --project moonshoot --format json
 
 ## Project Organization
 
+**Default Behavior:** All prompts are automatically saved to the `default` project unless you specify otherwise.
+
+```bash
+# These commands save to ~/.promptv/prompts/default/
+promptv commit --source prompt.md --name my-prompt
+promptv set my-prompt -c "Content here"
+promptv tag create my-prompt prod
+
+# These commands save to ~/.promptv/prompts/my-app/
+promptv commit --source prompt.md --name my-prompt --project my-app
+promptv set my-prompt -c "Content here" --project my-app
+promptv tag create my-prompt prod --project my-app
+```
+
 Use project tags to organize prompts and secrets:
 
 ```bash
@@ -419,12 +440,18 @@ promptv test --suite tests.json --output results.json
 ├── .config/
 │   └── config.yaml          # Configuration file
 └── prompts/
-    └── prompt-name/
-        ├── metadata.json     # Version metadata
-        ├── tags.json         # Tag registry
-        ├── v1.md            # Version 1
-        ├── v2.md            # Version 2
-        └── ...
+    ├── default/             # Default project (auto-created)
+    │   └── prompt-name/
+    │       ├── metadata.json     # Version metadata
+    │       ├── tags.json         # Tag registry
+    │       ├── v1.md            # Version 1
+    │       ├── v2.md            # Version 2
+    │       └── ...
+    └── my-app/              # Custom project
+        └── prompt-name/
+            ├── metadata.json
+            ├── tags.json
+            └── ...
 ```
 
 ## Diff Visualization
@@ -452,6 +479,9 @@ promptv set summarization-prompt -c "Summarize the following text in 3 sentences
 # Get the latest version of a prompt with variables
 promptv get email-template --var "name=John product=Widget"
 
+# Edit a prompt in your editor
+promptv edit email-template
+
 # Create a tag for production
 promptv tags create email-template prod --version 3
 
@@ -473,8 +503,7 @@ promptv secrets set openai_api_key
 # Estimate cost
 promptv estimate-cost my-prompt --model gpt-4
 
-# Launch playground
-promptv playground --prompt my-prompt
+# Run tests
 ```
 
 ## Development

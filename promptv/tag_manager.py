@@ -21,21 +21,24 @@ class TagManager:
         """
         self.prompts_dir = prompts_dir
     
-    def _get_tags_file(self, prompt_name: str) -> Path:
+    def _get_tags_file(self, prompt_name: str, project: Optional[str] = None) -> Path:
         """Get the path to tags.json for a prompt."""
+        if project:
+            return self.prompts_dir / project / prompt_name / "tags.json"
         return self.prompts_dir / prompt_name / "tags.json"
     
-    def _load_tags(self, prompt_name: str) -> TagRegistry:
+    def _load_tags(self, prompt_name: str, project: Optional[str] = None) -> TagRegistry:
         """
         Load tags for a prompt.
         
         Args:
             prompt_name: Name of the prompt
+            project: Optional project name
             
         Returns:
             TagRegistry object
         """
-        tags_file = self._get_tags_file(prompt_name)
+        tags_file = self._get_tags_file(prompt_name, project=project)
         
         if not tags_file.exists():
             # No tags yet - return empty registry
@@ -58,14 +61,15 @@ class TagManager:
             # If there's an error, return empty registry
             return TagRegistry(prompt_name=prompt_name, tags={})
     
-    def _save_tags(self, registry: TagRegistry):
+    def _save_tags(self, registry: TagRegistry, project: Optional[str] = None):
         """
         Save tags to disk.
         
         Args:
             registry: TagRegistry to save
+            project: Optional project name
         """
-        tags_file = self._get_tags_file(registry.prompt_name)
+        tags_file = self._get_tags_file(registry.prompt_name, project=project)
         tags_file.parent.mkdir(parents=True, exist_ok=True)
         
         # Convert to dict
@@ -87,7 +91,8 @@ class TagManager:
         tag_name: str,
         version: int,
         description: Optional[str] = None,
-        allow_update: bool = False
+        allow_update: bool = False,
+        project: Optional[str] = None
     ) -> Tag:
         """
         Create or update a tag pointing to a specific version.
@@ -98,6 +103,7 @@ class TagManager:
             version: Version number to tag
             description: Optional description for the tag
             allow_update: If True, allow updating existing tags
+            project: Optional project name
             
         Returns:
             The created/updated Tag object
@@ -107,12 +113,12 @@ class TagManager:
             TagAlreadyExistsError: If tag exists and allow_update is False
         """
         # Check if prompt exists
-        prompt_dir = self.prompts_dir / prompt_name
+        prompt_dir = self.prompts_dir / prompt_name if not project else self.prompts_dir / project / prompt_name
         if not prompt_dir.exists():
             raise PromptNotFoundError(prompt_name)
         
         # Load existing tags
-        registry = self._load_tags(prompt_name)
+        registry = self._load_tags(prompt_name, project=project)
         
         # Check if tag already exists
         now = datetime.now()
@@ -138,44 +144,47 @@ class TagManager:
             registry.tags[tag_name] = tag
         
         # Save changes
-        self._save_tags(registry)
+        self._save_tags(registry, project=project)
         
         return tag
     
-    def get_tag(self, prompt_name: str, tag_name: str) -> Optional[Tag]:
+    def get_tag(self, prompt_name: str, tag_name: str, project: Optional[str] = None) -> Optional[Tag]:
         """
         Retrieve a specific tag.
         
         Args:
             prompt_name: Name of the prompt
             tag_name: Name of the tag
+            project: Optional project name
             
         Returns:
             Tag object or None if not found
         """
-        registry = self._load_tags(prompt_name)
+        registry = self._load_tags(prompt_name, project=project)
         return registry.tags.get(tag_name)
     
-    def list_tags(self, prompt_name: str) -> Dict[str, Tag]:
+    def list_tags(self, prompt_name: str, project: Optional[str] = None) -> Dict[str, Tag]:
         """
         List all tags for a prompt.
         
         Args:
             prompt_name: Name of the prompt
+            project: Optional project name
             
         Returns:
             Dictionary of tag_name -> Tag
         """
-        registry = self._load_tags(prompt_name)
+        registry = self._load_tags(prompt_name, project=project)
         return registry.tags
     
-    def delete_tag(self, prompt_name: str, tag_name: str) -> bool:
+    def delete_tag(self, prompt_name: str, tag_name: str, project: Optional[str] = None) -> bool:
         """
         Delete a tag.
         
         Args:
             prompt_name: Name of the prompt
             tag_name: Name of the tag to delete
+            project: Optional project name
             
         Returns:
             True if tag was deleted, False if it didn't exist
@@ -183,7 +192,7 @@ class TagManager:
         Raises:
             TagNotFoundError: If the tag doesn't exist
         """
-        registry = self._load_tags(prompt_name)
+        registry = self._load_tags(prompt_name, project=project)
         
         if tag_name not in registry.tags:
             raise TagNotFoundError(tag_name, prompt_name)
@@ -192,11 +201,11 @@ class TagManager:
         del registry.tags[tag_name]
         
         # Save changes
-        self._save_tags(registry)
+        self._save_tags(registry, project=project)
         
         return True
     
-    def resolve_version(self, prompt_name: str, ref: str, max_version: int) -> int:
+    def resolve_version(self, prompt_name: str, ref: str, max_version: int, project: Optional[str] = None) -> int:
         """
         Resolve a reference (tag name, 'latest', or version number) to a version number.
         
@@ -204,6 +213,7 @@ class TagManager:
             prompt_name: Name of the prompt
             ref: Reference to resolve ('latest', tag name, or version number)
             max_version: Maximum available version number
+            project: Optional project name
             
         Returns:
             Resolved version number
@@ -241,7 +251,7 @@ class TagManager:
             # Not a number, try as tag
         
         # Try to resolve as tag
-        tag = self.get_tag(prompt_name, ref)
+        tag = self.get_tag(prompt_name, ref, project=project)
         if tag:
             return tag.version
         

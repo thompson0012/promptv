@@ -38,6 +38,22 @@ def sample_prompt(temp_prompts_dir):
     return "test-prompt"
 
 
+@pytest.fixture
+def sample_project_prompt(temp_prompts_dir):
+    """Create a sample prompt directory with project."""
+    project_dir = temp_prompts_dir / "my-app"
+    project_dir.mkdir()
+    prompt_dir = project_dir / "test-prompt"
+    prompt_dir.mkdir()
+    
+    # Create some version files
+    (prompt_dir / "v1.md").write_text("Version 1 content")
+    (prompt_dir / "v2.md").write_text("Version 2 content")
+    (prompt_dir / "v3.md").write_text("Version 3 content")
+    
+    return "test-prompt", "my-app"
+
+
 class TestTagManagerInit:
     """Test TagManager initialization."""
     
@@ -443,3 +459,92 @@ class TestEdgeCases:
         # This test ensures we don't crash on edge cases
         tags = tag_manager.list_tags("")
         assert tags == {}
+
+
+class TestProjectBasedTags:
+    """Test project-based tag functionality."""
+    
+    def test_create_tag_with_project(self, tag_manager, sample_project_prompt):
+        """Test creating a tag with project parameter."""
+        prompt_name, project = sample_project_prompt
+        
+        tag = tag_manager.create_tag(
+            prompt_name=prompt_name,
+            tag_name="prod",
+            version=2,
+            description="Production release",
+            project=project
+        )
+        
+        assert tag.name == "prod"
+        assert tag.version == 2
+        assert tag.description == "Production release"
+    
+    def test_list_tags_with_project(self, tag_manager, sample_project_prompt):
+        """Test listing tags with project parameter."""
+        prompt_name, project = sample_project_prompt
+        
+        # Create tags
+        tag_manager.create_tag(prompt_name, "prod", 2, project=project)
+        tag_manager.create_tag(prompt_name, "staging", 1, project=project)
+        
+        # List tags
+        tags = tag_manager.list_tags(prompt_name, project=project)
+        assert len(tags) == 2
+        assert "prod" in tags
+        assert "staging" in tags
+    
+    def test_get_tag_with_project(self, tag_manager, sample_project_prompt):
+        """Test getting a tag with project parameter."""
+        prompt_name, project = sample_project_prompt
+        
+        # Create tag
+        tag_manager.create_tag(prompt_name, "prod", 2, project=project)
+        
+        # Get tag
+        tag = tag_manager.get_tag(prompt_name, "prod", project=project)
+        assert tag is not None
+        assert tag.version == 2
+    
+    def test_delete_tag_with_project(self, tag_manager, sample_project_prompt):
+        """Test deleting a tag with project parameter."""
+        prompt_name, project = sample_project_prompt
+        
+        # Create tag
+        tag_manager.create_tag(prompt_name, "prod", 2, project=project)
+        
+        # Delete tag
+        result = tag_manager.delete_tag(prompt_name, "prod", project=project)
+        assert result is True
+        
+        # Verify deleted
+        tag = tag_manager.get_tag(prompt_name, "prod", project=project)
+        assert tag is None
+    
+    def test_resolve_version_with_project(self, tag_manager, sample_project_prompt):
+        """Test resolving version with project parameter."""
+        prompt_name, project = sample_project_prompt
+        
+        # Create tag
+        tag_manager.create_tag(prompt_name, "prod", 2, project=project)
+        
+        # Resolve version
+        version = tag_manager.resolve_version(prompt_name, "prod", 3, project=project)
+        assert version == 2
+    
+    def test_project_and_non_project_tags_separate(self, tag_manager, sample_prompt, sample_project_prompt):
+        """Test that project-based and non-project tags are separate."""
+        prompt_name, project = sample_project_prompt
+        
+        # Create tag without project
+        tag_manager.create_tag(sample_prompt, "prod", 1)
+        
+        # Create tag with project (same prompt name)
+        tag_manager.create_tag(prompt_name, "prod", 2, project=project)
+        
+        # Verify they're separate
+        tag_no_project = tag_manager.get_tag(sample_prompt, "prod")
+        tag_with_project = tag_manager.get_tag(prompt_name, "prod", project=project)
+        
+        assert tag_no_project.version == 1
+        assert tag_with_project.version == 2

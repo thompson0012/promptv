@@ -46,21 +46,23 @@ class PromptManager:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.prompts_dir.mkdir(parents=True, exist_ok=True)
     
-    def _get_prompt_dir(self, name: str) -> Path:
+    def _get_prompt_dir(self, name: str, project: Optional[str] = None) -> Path:
         """Get the directory for a specific prompt name."""
+        if project:
+            return self.prompts_dir / project / name
         return self.prompts_dir / name
     
-    def _get_metadata_file(self, name: str) -> Path:
+    def _get_metadata_file(self, name: str, project: Optional[str] = None) -> Path:
         """Get the metadata file path for a prompt."""
-        return self._get_prompt_dir(name) / "metadata.json"
+        return self._get_prompt_dir(name, project=project) / "metadata.json"
     
-    def _load_metadata(self, name: str) -> PromptMetadata:
+    def _load_metadata(self, name: str, project: Optional[str] = None) -> PromptMetadata:
         """
         Load metadata for a prompt.
         
         Handles both old and new metadata formats for backward compatibility.
         """
-        metadata_file = self._get_metadata_file(name)
+        metadata_file = self._get_metadata_file(name, project=project)
         
         if not metadata_file.exists():
             # New prompt - create initial metadata
@@ -199,13 +201,14 @@ class PromptManager:
             words = content.split()
             return int(len(words) * 1.3)
     
-    def get_prompt_with_metadata(self, name: str, version: str = "latest") -> Tuple[str, VersionMetadata]:
+    def get_prompt_with_metadata(self, name: str, version: str = "latest", project: Optional[str] = None) -> Tuple[str, VersionMetadata]:
         """
         Get prompt content along with its metadata.
         
         Args:
             name: Name of the prompt
             version: Version to retrieve (default: "latest")
+            project: Optional project name
             
         Returns:
             Tuple of (content, version_metadata)
@@ -214,7 +217,7 @@ class PromptManager:
             PromptNotFoundError: If prompt doesn't exist
             VersionNotFoundError: If version doesn't exist
         """
-        metadata = self._load_metadata(name)
+        metadata = self._load_metadata(name, project=project)
         
         if not metadata.versions:
             raise PromptNotFoundError(name)
@@ -238,7 +241,7 @@ class PromptManager:
         
         raise VersionNotFoundError(name, version)
     
-    def commit_prompt(self, source_file: str, name: str, message: Optional[str] = None) -> Dict:
+    def commit_prompt(self, source_file: str, name: str, message: Optional[str] = None, project: Optional[str] = None) -> Dict:
         """
         Save a prompt file with a specific name.
         
@@ -246,6 +249,7 @@ class PromptManager:
             source_file: Path to the source file
             name: Name to save the prompt as
             message: Optional commit message
+            project: Optional project name
             
         Returns:
             Dictionary with commit information
@@ -263,13 +267,13 @@ class PromptManager:
         content = self._convert_to_markdown(content, str(source_path))
         
         # Load existing metadata
-        metadata = self._load_metadata(name)
+        metadata = self._load_metadata(name, project=project)
         
         # Get next version number
         version = metadata.current_version + 1
         
         # Create prompt directory
-        prompt_dir = self._get_prompt_dir(name)
+        prompt_dir = self._get_prompt_dir(name, project=project)
         prompt_dir.mkdir(parents=True, exist_ok=True)
         
         # Save the prompt file
@@ -310,7 +314,7 @@ class PromptManager:
             "file_path": str(prompt_file)
         }
     
-    def set_prompt(self, name: str, content: str, message: Optional[str] = None) -> Dict:
+    def set_prompt(self, name: str, content: str, message: Optional[str] = None, project: Optional[str] = None) -> Dict:
         """
         Set/update a prompt with the given name.
         
@@ -318,18 +322,19 @@ class PromptManager:
             name: Name of the prompt
             content: Content of the prompt
             message: Optional commit message
+            project: Optional project name
             
         Returns:
             Dictionary with set information
         """
         # Load existing metadata
-        metadata = self._load_metadata(name)
+        metadata = self._load_metadata(name, project=project)
         
         # Get next version number
         version = metadata.current_version + 1
         
         # Create prompt directory
-        prompt_dir = self._get_prompt_dir(name)
+        prompt_dir = self._get_prompt_dir(name, project=project)
         prompt_dir.mkdir(parents=True, exist_ok=True)
         
         # Convert to markdown
@@ -373,39 +378,41 @@ class PromptManager:
             "file_path": str(prompt_file)
         }
     
-    def get_prompt(self, name: str, version: str = "latest") -> Optional[str]:
+    def get_prompt(self, name: str, version: str = "latest", project: Optional[str] = None) -> Optional[str]:
         """
         Retrieve a specific version of a prompt.
         
         Args:
             name: Name of the prompt
             version: Version to retrieve (default: "latest")
+            project: Optional project name
             
         Returns:
             Content of the prompt or None if not found
         """
         try:
-            content, _ = self.get_prompt_with_metadata(name, version)
+            content, _ = self.get_prompt_with_metadata(name, version, project=project)
             return content
         except (PromptNotFoundError, VersionNotFoundError):
             return None
     
-    def list_versions(self, name: str) -> Optional[Dict]:
+    def list_versions(self, name: str, project: Optional[str] = None) -> Optional[Dict]:
         """
         List all versions and metadata for a specific prompt name.
         
         Args:
             name: Name of the prompt
+            project: Optional project name
             
         Returns:
             Dictionary with prompt metadata or None if not found
         """
-        prompt_dir = self._get_prompt_dir(name)
+        prompt_dir = self._get_prompt_dir(name, project=project)
         if not prompt_dir.exists():
             return None
         
         try:
-            metadata = self._load_metadata(name)
+            metadata = self._load_metadata(name, project=project)
             
             # Convert to dict for backward compatibility
             result = {
@@ -432,19 +439,20 @@ class PromptManager:
         except Exception:
             return None
     
-    def remove_prompts(self, names: List[str]) -> Dict[str, bool]:
+    def remove_prompts(self, names: List[str], project: Optional[str] = None) -> Dict[str, bool]:
         """
         Remove one or more prompts by name.
         
         Args:
             names: List of prompt names to remove
+            project: Optional project name
             
         Returns:
             Dictionary mapping names to success status
         """
         results = {}
         for name in names:
-            prompt_dir = self._get_prompt_dir(name)
+            prompt_dir = self._get_prompt_dir(name, project=project)
             if prompt_dir.exists():
                 shutil.rmtree(prompt_dir)
                 results[name] = True
@@ -452,6 +460,6 @@ class PromptManager:
                 results[name] = False
         return results
     
-    def prompt_exists(self, name: str) -> bool:
+    def prompt_exists(self, name: str, project: Optional[str] = None) -> bool:
         """Check if a prompt exists."""
-        return self._get_prompt_dir(name).exists()
+        return self._get_prompt_dir(name, project=project).exists()

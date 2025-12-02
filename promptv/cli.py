@@ -1,5 +1,8 @@
 import click
 import sys
+import os
+import tempfile
+import subprocess
 from pathlib import Path
 import shutil
 from .manager import PromptManager
@@ -26,11 +29,10 @@ from .utils import (
 )
 from .resources import list_available_models, get_pricing_data_date
 from .diff_engine import DiffEngine, DiffFormat
-from .playground.app import run_playground
 
 
 @click.group()
-@click.version_option(version='0.1.4')
+@click.version_option(version='0.1.6')
 @click.pass_context
 def cli(ctx):
     """
@@ -57,7 +59,8 @@ def cli(ctx):
 @click.option('--name', required=True, help='Name for the prompt')
 @click.option('--message', '-m', help='Commit message describing the changes')
 @click.option('--tag', help='Create a tag for this version')
-def commit(source, name, message, tag):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def commit(source, name, message, tag, project):
     """
     Save a prompt file with a specific name.
     
@@ -65,11 +68,13 @@ def commit(source, name, message, tag):
         promptv commit --source prompt.md --name my-prompt
         promptv commit --source prompt.md --name my-prompt -m "Updated instructions"
         promptv commit --source prompt.md --name my-prompt --tag prod
+        promptv commit --source prompt.md --name my-prompt --project my-app
     """
     try:
         manager = PromptManager()
-        result = manager.commit_prompt(source, name, message=message)
+        result = manager.commit_prompt(source, name, message=message, project=project)
         click.echo(f"✓ Committed prompt '{result['name']}' (version {result['version']})")
+        click.echo(f"  Project: {project}")
         if message:
             click.echo(f"  Message: {message}")
         click.echo(f"  Saved to: {result['file_path']}")
@@ -81,7 +86,8 @@ def commit(source, name, message, tag):
                 prompt_name=name,
                 tag_name=tag,
                 version=result['version'],
-                allow_update=True
+                allow_update=True,
+                project=project
             )
             click.echo(f"  Tagged as: {tag}")
             
@@ -101,7 +107,8 @@ def commit(source, name, message, tag):
 @click.option('--file', '-f', type=click.Path(exists=True), help='Read content from file')
 @click.option('--content', '-c', help='Direct content input')
 @click.option('--message', '-m', help='Commit message describing the changes')
-def set(name, file, content, message):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def set(name, file, content, message, project):
     """
     Set/update a prompt with the given name.
     
@@ -111,6 +118,7 @@ def set(name, file, content, message):
         promptv set my-prompt -f prompt.txt
         promptv set my-prompt -c "This is my prompt content"
         promptv set my-prompt -m "Updated with new instructions" -f prompt.txt
+        promptv set my-prompt --project my-app -f prompt.txt
         echo "Content" | promptv set my-prompt
     """
     try:
@@ -135,11 +143,93 @@ def set(name, file, content, message):
             click.echo("Error: No content provided", err=True)
             sys.exit(1)
         
-        result = manager.set_prompt(name, prompt_content, message=message)
+        result = manager.set_prompt(name, prompt_content, message=message, project=project)
         click.echo(f"✓ Set prompt '{result['name']}' (version {result['version']})")
+        click.echo(f"  Project: {project}")
         if message:
             click.echo(f"  Message: {message}")
         click.echo(f"  Saved to: {result['file_path']}")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument('name')
+@click.option('--version', default='latest', help='Version to edit (default: latest)')
+@click.option('--message', '-m', help='Commit message for the changes')
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+@click.option('--editor', help='Editor to use (default: $EDITOR or $VISUAL or nano)')
+def edit(name, version, message, project, editor):
+    """
+    Edit a prompt directly in your terminal editor.
+    
+    Opens the specified prompt version in your default editor ($EDITOR or $VISUAL),
+    or nano if neither is set. After editing, saves the changes as a new version.
+    
+    Examples:
+        promptv edit my-prompt
+        promptv edit my-prompt --version 2
+        promptv edit my-prompt -m "Updated instructions"
+        promptv edit my-prompt --project my-app
+        promptv edit my-prompt --editor vim
+    """
+    try:
+        manager = PromptManager()
+        
+        # Check if prompt exists
+        if not manager.prompt_exists(name, project=project):
+            click.echo(f"Error: Prompt '{name}' not found", err=True)
+            click.echo(f"  Project: {project}", err=True)
+            sys.exit(1)
+        
+        # Get the current content
+        content = manager.get_prompt(name, version, project=project)
+        
+        if content is None:
+            click.echo(f"Error: Version '{version}' not found for prompt '{name}'", err=True)
+            sys.exit(1)
+        
+        # Determine which editor to use
+        if not editor:
+            editor = os.environ.get('EDITOR') or os.environ.get('VISUAL') or 'nano'
+        
+        # Create a temporary file with the content
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as tmp_file:
+            tmp_file.write(content)
+            tmp_path = tmp_file.name
+        
+        try:
+            # Open the editor
+            subprocess.run([editor, tmp_path], check=True)
+            
+            # Read the edited content
+            with open(tmp_path, 'r') as f:
+                edited_content = f.read()
+            
+            # Check if content was changed
+            if edited_content == content:
+                click.echo("No changes made. Prompt not updated.")
+                return
+            
+            # Save the new version
+            result = manager.set_prompt(name, edited_content, message=message, project=project)
+            click.echo(f"✓ Updated prompt '{result['name']}' (version {result['version']})")
+            click.echo(f"  Project: {project}")
+            if message:
+                click.echo(f"  Message: {message}")
+            click.echo(f"  Saved to: {result['file_path']}")
+            
+        finally:
+            # Clean up temporary file
+            os.unlink(tmp_path)
+            
+    except PromptNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except subprocess.CalledProcessError:
+        click.echo("Error: Editor exited with error", err=True)
+        sys.exit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -172,7 +262,8 @@ def parse_variables(ctx, param, value):
 @click.option('--label', help='Tag/label to retrieve')
 @click.option('--var', multiple=True, callback=parse_variables, 
               help='Variable substitution (supports: "key1=val1 key2=val2" or multiple --var flags)')
-def get(name, version, label, var):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def get(name, version, label, var, project):
     """
     Retrieve a specific version of a prompt.
     
@@ -182,6 +273,7 @@ def get(name, version, label, var):
         promptv get my-prompt --label prod
         promptv get my-prompt --var "name=Alice count=5"
         promptv get my-prompt --var key1=val1 --var key2=val2
+        promptv get my-prompt --project my-app
     """
     try:
         manager = PromptManager()
@@ -195,18 +287,18 @@ def get(name, version, label, var):
         # Resolve version reference
         if label:
             # Resolve tag to version number
-            metadata = manager._load_metadata(name)
+            metadata = manager._load_metadata(name, project=project)
             if not metadata.versions:
                 raise PromptNotFoundError(name)
             max_version = metadata.current_version
-            version_num = tag_manager.resolve_version(name, label, max_version)
+            version_num = tag_manager.resolve_version(name, label, max_version, project=project)
             version_ref = str(version_num)
         elif version:
             version_ref = version
         else:
             version_ref = "latest"
         
-        content = manager.get_prompt(name, version_ref)
+        content = manager.get_prompt(name, version_ref, project=project)
         
         if content is None:
             click.echo(f"Error: Prompt '{name}' not found or version '{version_ref}' does not exist", err=True)
@@ -248,7 +340,8 @@ def get(name, version, label, var):
 @click.argument('name', required=False)
 @click.option('--show-tags', is_flag=True, help='Show tags for each prompt')
 @click.option('--show-variables', is_flag=True, help='Show variables for each version')
-def list_command(name, show_tags, show_variables):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def list_command(name, show_tags, show_variables, project):
     """
     List all versions and metadata for a specific prompt name.
     If no name is provided, list all prompts.
@@ -258,6 +351,7 @@ def list_command(name, show_tags, show_variables):
         promptv list my-prompt
         promptv list my-prompt --show-tags
         promptv list my-prompt --show-variables
+        promptv list --project my-app
     """
     try:
         manager = PromptManager()
@@ -265,18 +359,19 @@ def list_command(name, show_tags, show_variables):
         
         if name:
             # List specific prompt
-            metadata = manager.list_versions(name)
+            metadata = manager.list_versions(name, project=project)
             
             if metadata is None:
                 click.echo(f"Error: Prompt '{name}' not found", err=True)
                 sys.exit(1)
             
             click.echo(f"Prompt: {metadata['name']}")
+            click.echo(f"Project: {project}")
             click.echo(f"Total versions: {len(metadata['versions'])}")
             
             # Show tags if requested
             if show_tags:
-                tags = tag_manager.list_tags(name)
+                tags = tag_manager.list_tags(name, project=project)
                 if tags:
                     click.echo(f"\nTags:")
                     for tag_name, tag_obj in tags.items():
@@ -334,7 +429,8 @@ def list_command(name, show_tags, show_variables):
 @cli.command()
 @click.argument('names', nargs=-1, required=True)
 @click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
-def remove(names, yes):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def remove(names, yes, project):
     """
     Remove one or more prompts by name.
     
@@ -342,13 +438,14 @@ def remove(names, yes):
         promptv remove my-prompt
         promptv remove prompt1 prompt2 prompt3
         promptv remove my-prompt --yes
+        promptv remove my-prompt --project my-app
     """
     try:
         manager = PromptManager()
         
         # Check which prompts exist
-        existing = [name for name in names if manager.prompt_exists(name)]
-        not_existing = [name for name in names if not manager.prompt_exists(name)]
+        existing = [name for name in names if manager.prompt_exists(name, project=project)]
+        not_existing = [name for name in names if not manager.prompt_exists(name, project=project)]
         
         if not existing:
             click.echo("Error: None of the specified prompts exist", err=True)
@@ -367,12 +464,13 @@ def remove(names, yes):
             click.echo(f"About to remove {len(existing)} prompt(s):")
             for name in existing:
                 click.echo(f"  - {name}")
+            click.echo(f"  Project: {project}")
             if not click.confirm("\nAre you sure?"):
                 click.echo("Cancelled")
                 return
         
         # Remove prompts
-        results = manager.remove_prompts([n for n in names])
+        results = manager.remove_prompts([n for n in names], project=project)
         
         click.echo()
         for name, success in results.items():
@@ -398,7 +496,8 @@ def tag():
 @click.option('--version', '-v', type=int, help='Version to tag (default: latest)')
 @click.option('--description', '-d', help='Tag description')
 @click.option('--force', '-f', is_flag=True, help='Update existing tag')
-def tag_create(prompt_name, tag_name, version, description, force):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def tag_create(prompt_name, tag_name, version, description, force, project):
     """
     Create a tag for a specific version.
     
@@ -406,13 +505,14 @@ def tag_create(prompt_name, tag_name, version, description, force):
         promptv tag create my-prompt prod --version 3
         promptv tag create my-prompt stable -d "Stable release"
         promptv tag create my-prompt prod --force  # Update existing tag to latest
+        promptv tag create my-prompt prod --project my-app
     """
     try:
         manager = PromptManager()
         tag_manager = TagManager(manager.prompts_dir)
         
         # Get metadata to determine version
-        metadata = manager._load_metadata(prompt_name)
+        metadata = manager._load_metadata(prompt_name, project=project)
         if not metadata.versions:
             raise PromptNotFoundError(prompt_name)
         
@@ -430,11 +530,13 @@ def tag_create(prompt_name, tag_name, version, description, force):
             tag_name=tag_name,
             version=version,
             description=description,
-            allow_update=force
+            allow_update=force,
+            project=project
         )
         
         action = "Updated" if force else "Created"
         click.echo(f"✓ {action} tag '{tag_name}' → v{version} for prompt '{prompt_name}'")
+        click.echo(f"  Project: {project}")
         if description:
             click.echo(f"  Description: {description}")
             
@@ -451,22 +553,24 @@ def tag_create(prompt_name, tag_name, version, description, force):
 
 @tag.command('list')
 @click.argument('prompt_name')
-def tag_list(prompt_name):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def tag_list(prompt_name, project):
     """
     List all tags for a prompt.
     
-    Example:
+    Examples:
         promptv tag list my-prompt
+        promptv tag list my-prompt --project my-app
     """
     try:
         manager = PromptManager()
         tag_manager = TagManager(manager.prompts_dir)
         
         # Check if prompt exists
-        if not manager.prompt_exists(prompt_name):
+        if not manager.prompt_exists(prompt_name, project=project):
             raise PromptNotFoundError(prompt_name)
         
-        tags = tag_manager.list_tags(prompt_name)
+        tags = tag_manager.list_tags(prompt_name, project=project)
         
         if not tags:
             click.echo(f"No tags found for prompt '{prompt_name}'")
@@ -492,24 +596,27 @@ def tag_list(prompt_name):
 @tag.command('show')
 @click.argument('prompt_name')
 @click.argument('tag_name')
-def tag_show(prompt_name, tag_name):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def tag_show(prompt_name, tag_name, project):
     """
     Show details about a specific tag.
     
-    Example:
+    Examples:
         promptv tag show my-prompt prod
+        promptv tag show my-prompt prod --project my-app
     """
     try:
         manager = PromptManager()
         tag_manager = TagManager(manager.prompts_dir)
         
-        tag_obj = tag_manager.get_tag(prompt_name, tag_name)
+        tag_obj = tag_manager.get_tag(prompt_name, tag_name, project=project)
         
         if tag_obj is None:
             raise TagNotFoundError(tag_name, prompt_name)
         
         click.echo(f"Tag: {tag_obj.name}")
         click.echo(f"Prompt: {prompt_name}")
+        click.echo(f"Project: {project}")
         click.echo(f"Version: {tag_obj.version}")
         if tag_obj.description:
             click.echo(f"Description: {tag_obj.description}")
@@ -528,31 +635,34 @@ def tag_show(prompt_name, tag_name):
 @click.argument('prompt_name')
 @click.argument('tag_name')
 @click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
-def tag_delete(prompt_name, tag_name, yes):
+@click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
+def tag_delete(prompt_name, tag_name, yes, project):
     """
     Delete a tag.
     
     Examples:
         promptv tag delete my-prompt old-version
         promptv tag delete my-prompt staging --yes
+        promptv tag delete my-prompt prod --project my-app
     """
     try:
         manager = PromptManager()
         tag_manager = TagManager(manager.prompts_dir)
         
         # Check if tag exists
-        tag_obj = tag_manager.get_tag(prompt_name, tag_name)
+        tag_obj = tag_manager.get_tag(prompt_name, tag_name, project=project)
         if tag_obj is None:
             raise TagNotFoundError(tag_name, prompt_name)
         
         # Confirm deletion
         if not yes:
             click.echo(f"About to delete tag '{tag_name}' (→ v{tag_obj.version}) from prompt '{prompt_name}'")
+            click.echo(f"  Project: {project}")
             if not click.confirm("\nAre you sure?"):
                 click.echo("Cancelled")
                 return
         
-        tag_manager.delete_tag(prompt_name, tag_name)
+        tag_manager.delete_tag(prompt_name, tag_name, project=project)
         click.echo(f"✓ Deleted tag '{tag_name}' from prompt '{prompt_name}'")
         
     except TagNotFoundError as e:
@@ -1456,33 +1566,6 @@ def diff(prompt_name, ref_a, ref_b, diff_format):
         sys.exit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
-
-
-@cli.command()
-@click.argument('prompt_name', required=False)
-def playground(prompt_name):
-    """
-    Launch interactive playground TUI for testing prompts.
-    
-    Provides a visual interface for:
-    - Browsing and selecting prompts
-    - Editing prompt content
-    - Testing with variables
-    - Real-time cost estimation
-    - Mock LLM execution
-    
-    Examples:
-        promptv playground
-        promptv playground my-prompt
-    """
-    try:
-        run_playground(prompt_name=prompt_name)
-    except KeyboardInterrupt:
-        # Clean exit on Ctrl+C
-        click.echo("\n👋 Playground closed.")
-    except Exception as e:
-        click.echo(f"Error launching playground: {e}", err=True)
         sys.exit(1)
 
 

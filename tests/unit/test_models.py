@@ -11,7 +11,6 @@ from promptv.models import (
     CostEstimate,
     CacheConfig,
     CostEstimationConfig,
-    PlaygroundConfig,
     Config,
 )
 
@@ -220,21 +219,12 @@ class TestConfig:
         assert config.default_model == "gpt-4"
         assert config.default_provider == "openai"
     
-    def test_playground_config_defaults(self):
-        """Test PlaygroundConfig default values."""
-        config = PlaygroundConfig()
-        
-        assert config.default_provider == "openai"
-        assert config.default_model == "gpt-4"
-        assert config.show_cost_estimate is True
-    
     def test_main_config_creation(self):
         """Test main Config with defaults."""
         config = Config()
         
         assert config.cache.enabled is True
         assert config.cost_estimation.default_model == "gpt-4"
-        assert config.playground.show_cost_estimate is True
     
     def test_main_config_customization(self):
         """Test main Config with custom values."""

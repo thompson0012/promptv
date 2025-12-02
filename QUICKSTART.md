@@ -51,22 +51,32 @@ source <(promptv secrets activate --project my-app)
 
 ### 2. Create Your First Prompt
 
+**Note:** All prompts are saved to the `default` project unless you specify `--project`.
+
 ```bash
-# Create a simple prompt
+# Create a simple prompt (saved to /default)
 promptv set greeting -c "Hello, {{name}}!"
 
 # Create a more complex prompt with multiple variables
 promptv set welcome-email -c "Hello {{user_name}}, welcome to {{product}}!"
+
+# Create a prompt in a specific project
+promptv set api-prompt -c "API request template" --project my-app
 ```
 
 ### 3. Tag Versions
 
+**Note:** Tags are scoped to projects. Tags in `default` are separate from tags in `my-app`.
+
 ```bash
-# Tag the current version as production
+# Tag the current version as production (in default project)
 promptv tag create welcome-email prod --description "Production ready"
 
 # Tag as staging
 promptv tag create welcome-email staging --description "Staging environment"
+
+# Tag with project organization
+promptv tag create welcome-email prod --project my-app --description "Production for my-app"
 ```
 
 ### 4. Retrieve and Render Prompts
@@ -88,6 +98,9 @@ promptv get welcome-email --label prod --var user_name=Bob --var product="Prompt
 # List all prompts
 promptv list
 
+# List prompts in a specific project
+promptv list --project my-app
+
 # List with tags and variables
 promptv list --show-tags --show-variables
 
@@ -96,6 +109,7 @@ promptv variables list welcome-email
 
 # Show all tags
 promptv tag list welcome-email
+promptv tag list welcome-email --project my-app
 ```
 
 ## Python SDK Usage
