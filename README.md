@@ -26,7 +26,6 @@ A command-line interface tool for managing prompts locally with versioning suppo
 - Variable substitution with Jinja2 templates
 - Tag/label system for easy version references
 - Cost estimation for LLM API calls
-- API testing with LLM integration
 - Project-based organization for prompts and secrets
 - Git-style diff visualization
 
@@ -41,8 +40,8 @@ cd promptv
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install the package
-pip install promptv
+# Install the package in development mode
+pip install -e .
 ```
 
 ## Configuration
@@ -64,7 +63,10 @@ This creates:
 │   └── pricing.yaml     # LLM pricing data (customizable)
 ├── .secrets/
 │   └── secrets.json     # API keys and secrets
-└── prompts/             # Saved prompts
+├── cache/               # Cache directory
+├── presets/             # Presets directory
+├── prompts/             # Saved prompts
+└── sessions/            # Sessions directory
 ```
 
 **Note:** promptv will automatically initialize on first command if not already done.
@@ -92,6 +94,15 @@ llm_providers:
   anthropic:
     api_base_url: "https://api.anthropic.com/v1"
     default_model: "claude-3-5-sonnet-20241022"
+  cohere:
+    api_base_url: "https://api.cohere.ai/v1"
+    default_model: "command-r-plus"
+  google:
+    api_base_url: "https://generativelanguage.googleapis.com/v1"
+    default_model: "gemini-pro"
+  together:
+    api_base_url: "https://api.together.xyz/v1"
+    default_model: "meta-llama/Llama-3-70b-chat-hf"
   custom:
     api_base_url: "http://localhost:8000/v1"
     default_model: "custom-model"
@@ -173,7 +184,7 @@ The file is copied from package resources during initialization and never auto-u
    promptv remove prompt-name --yes  # Skip confirmation
    ```
 
-7. **tags** - Manage tags/labels for versions
+7. **tag** - Manage tags/labels for versions
 
    ```bash
    promptv tag create prompt-name tag-name --version 1
@@ -182,7 +193,7 @@ The file is copied from package resources during initialization and never auto-u
    promptv tag list prompt-name --project my-app
    promptv tag show prompt-name tag-name --project my-app
    promptv tag delete prompt-name tag-name
-   promptv tag delete prompt-name tag-name --project my-app
+   promptv tag delete prompt-name tag-name --project my-app --yes
    ```
 
 8. **secrets** - Manage API keys and secrets securely
@@ -213,9 +224,9 @@ The file is copied from package resources during initialization and never auto-u
    promptv secrets delete openai --provider
    promptv secrets delete DATABASE_URL --project my-app --yes
 
-   # Activate secrets in shell (like 'source .env')
+   # Export secrets in shell (like 'source .env')
    source <(promptv secrets export --format shell --project moonshoot)
-   eval "$(promptv secrets export --project moonshoot)"
+   eval "$(promptv secrets export --format shell --project moonshoot)"
 
    # Convert to .env file
    promptv secrets export --format dotenv
@@ -230,16 +241,38 @@ The file is copied from package resources during initialization and never auto-u
    promptv diff prompt-name v1 v2 --format side-by-side  # Shows --, ++, ~~ markers
    ```
 
-10. **estimate-cost** - Estimate cost of running a prompt
+10. **cost** - Cost estimation commands for LLM API calls
 
-```bash
-promptv estimate-cost prompt-name --model gpt-4 --provider openai
-promptv estimate-cost prompt-name --output-tokens 1000
-```
-
-11. **test** - Run API tests with LLM integration
     ```bash
-    promptv test --suite test-suite.json
+    # Estimate cost of running a prompt
+    promptv cost estimate prompt-name --model gpt-4 --provider openai
+    promptv cost estimate prompt-name --output-tokens 1000
+
+    # Compare costs across multiple models
+    promptv cost compare prompt-name --models gpt-4,gpt-3.5-turbo --provider openai
+
+    # Count tokens in a prompt
+    promptv cost tokens prompt-name
+
+    # List available models
+    promptv cost models
+    ```
+
+11. **render** - Render a prompt with variable substitution
+
+    ```bash
+    promptv render prompt-name --var name=Alice --var count=5
+    promptv render prompt-name --label prod --var api_key=sk-xxx
+    promptv render prompt-name --version 2 --var temperature=0.7
+    promptv render prompt-name --project my-app --var name=Bob
+    ```
+
+12. **variables** - Manage and inspect variables in prompts
+
+    ```bash
+    promptv variables list prompt-name
+    promptv variables list prompt-name --version 2
+    promptv variables list prompt-name --label prod
     ```
 
 ## Secrets Management
@@ -304,35 +337,41 @@ promptv secrets list
 promptv secrets list --project my-app
 ```
 
-### Activating Secrets in Shell
+### Exporting Secrets
 
 Similar to `source .env`, you can export all secrets for a project to your current shell:
 
 ```bash
-# Basic usage - activate default project
-source <(promptv secrets activate)
+# Basic usage - export default project
+source <(promptv secrets export)
+promptv secrets export > .env
 
-# Activate specific project
-source <(promptv secrets activate --project moonshoot)
+# Export specific project
+source <(promptv secrets export --project moonshoot)
 
 # Alternative syntax with eval
-eval "$(promptv secrets activate --project moonshoot)"
+eval "$(promptv secrets export --project moonshoot)"
 
 # Exclude provider API keys
-source <(promptv secrets activate --project moonshoot --no-include-providers)
+source <(promptv secrets export --project moonshoot --no-include-providers)
+
+# Different output formats
+promptv secrets export --format json
+promptv secrets export --format shell
+promptv secrets export --format dotenv
 ```
 
 **Shell Function Helper** (add to `~/.bashrc` or `~/.zshrc`):
 
 ```bash
-# Convenient alias for activating secrets
-promptv-activate() {
-    eval "$(promptv secrets activate --project ${1:-default})"
+# Convenient alias for exporting secrets
+promptv-export() {
+    eval "$(promptv secrets export --format shell --project ${1:-default})"
 }
 
 # Usage:
-promptv-activate                # Activate default project
-promptv-activate moonshoot      # Activate moonshoot project
+promptv-export                # Export default project
+promptv-export moonshoot      # Export moonshoot project
 ```
 
 **How it works:**
@@ -345,14 +384,14 @@ promptv-activate moonshoot      # Activate moonshoot project
 **Output formats:**
 
 ```bash
-# Shell format (default) - includes comment
-promptv secrets activate --project moonshoot
+# Shell format (default) - includes export statements
+promptv secrets export --project moonshoot --format shell
 
-# Export statements only (no comments)
-promptv secrets activate --project moonshoot --format export
+# Dotenv format (standard .env file format)
+promptv secrets export --project moonshoot --format dotenv
 
 # JSON format for other tools
-promptv secrets activate --project moonshoot --format json
+promptv secrets export --project moonshoot --format json
 ```
 
 ### Security
@@ -409,32 +448,10 @@ Retrieve with variables:
 promptv get welcome-email --var "name=Alice product=MyApp support_email=help@example.com"
 ```
 
-## API Testing
-
-Create a test suite JSON file:
-
-```json
-{
-  "name": "greeting-tests",
-  "prompt_name": "greeting-prompt",
-  "prompt_version": "latest",
-  "provider": "openai",
-  "model": "gpt-4",
-  "test_cases": [
-    {
-      "name": "test-formal",
-      "variables": { "tone": "formal", "name": "Alice" },
-      "expected_contains": ["Dear", "Alice"],
-      "max_tokens": 100
-    }
-  ]
-}
-```
-
-Run tests:
+Render with variables:
 
 ```bash
-promptv test --suite tests.json --output results.json
+promptv render welcome-email --var "name=Alice product=MyApp support_email=help@example.com"
 ```
 
 ## Directory Structure
@@ -442,7 +459,13 @@ promptv test --suite tests.json --output results.json
 ```
 ~/.promptv/
 ├── .config/
-│   └── config.yaml          # Configuration file
+│   ├── config.yaml          # Configuration file
+│   └── pricing.yaml         # Pricing data
+├── .secrets/
+│   └── secrets.json         # Encrypted secrets
+├── cache/                   # Cache directory
+├── presets/                 # Presets directory
+├── sessions/                # Sessions directory
 └── prompts/
     ├── default/             # Default project (auto-created)
     │   └── prompt-name/
@@ -483,11 +506,14 @@ promptv set summarization-prompt -c "Summarize the following text in 3 sentences
 # Get the latest version of a prompt with variables
 promptv get email-template --var "name=John product=Widget"
 
+# Render a prompt with variables
+promptv render email-template --var "name=John product=Widget"
+
 # Edit a prompt in your editor
 promptv edit email-template
 
 # Create a tag for production
-promptv tags create email-template prod --version 3
+promptv tag create email-template prod --version 3
 
 # Get production version
 promptv get email-template --label prod
@@ -502,12 +528,13 @@ promptv list chatgpt-instructions
 promptv remove chatgpt-instructions summarization-prompt --yes
 
 # Set API key
-promptv secrets set openai_api_key
+promptv secrets set openai --provider
 
 # Estimate cost
-promptv estimate-cost my-prompt --model gpt-4
+promptv cost estimate my-prompt --model gpt-4
 
-# Run tests
+# Export secrets to .env file
+promptv secrets export --project my-app > .env
 ```
 
 ## Development
