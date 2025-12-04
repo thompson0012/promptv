@@ -17,7 +17,7 @@ A command-line interface tool for managing prompts locally with versioning suppo
 ## Features
 
 - Local prompt management with version control
-- Cloud storage support with API key and project ID
+<!-- - Cloud storage support with API key and project ID -->
 - Markdown format support for all prompts
 - Automatic directory creation on first run
 - Full version history tracking
