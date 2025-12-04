@@ -1202,49 +1202,55 @@ def secrets_test(provider):
         sys.exit(1)
 
 
-@secrets.command('activate')
+@secrets.command('export')
 @click.option('--project', default='default',
-              help='Project name to activate secrets from (default: "default")')
+              help='Project name to export secrets from (default: "default")')
 @click.option('--format', 'output_format', 
-              type=click.Choice(['shell', 'json', 'export'], case_sensitive=False),
-              default='shell',
-              help='Output format: shell (default), json, or export')
+              type=click.Choice(['shell', 'json', 'dotenv'], case_sensitive=False),
+              default='dotenv',
+              help='Output format: dotenv (default - standard .env file format), shell (for sourcing), or json')
 @click.option('--include-providers/--no-include-providers',
               default=True,
               help='Include provider API keys (default: True)')
-def secrets_activate(project, output_format, include_providers):
+def secrets_export(project, output_format, include_providers):
     """
-    Export secrets as environment variables for shell sourcing.
+    Export secrets as environment variables.
     
-    This command outputs shell export statements that can be sourced
-    into your current shell, similar to 'source .env'.
+    By default, outputs standard .env file format (KEY=value) that can be
+    saved to a file or used with tools that read .env files.
+    
+    Use --format shell for export statements that can be sourced into your shell.
     
     Usage:
-        source <(promptv secrets activate --project moonshoot)
-        eval "$(promptv secrets activate --project moonshoot)"
+        # Save to .env file (default format)
+        promptv secrets export --project moonshoot > .env
+        
+        # Source into shell (shell format)
+        source <(promptv secrets export --format shell --project moonshoot)
+        eval "$(promptv secrets export --format shell --project moonshoot)"
     
     Shell Function (add to ~/.bashrc or ~/.zshrc):
-        promptv-activate() {
-            eval "$(promptv secrets activate --project ${1:-default})"
+        promptv-export() {
+            eval "$(promptv secrets export --format shell --project ${1:-default})"
         }
         
-        # Then use: promptv-activate moonshoot
+        # Then use: promptv-export moonshoot
     
     Examples:
-        # Activate default project
-        source <(promptv secrets activate)
+        # Export to .env file (default)
+        promptv secrets export > .env
         
-        # Activate specific project
-        source <(promptv secrets activate --project moonshoot)
+        # Export specific project to .env file
+        promptv secrets export --project moonshoot > .env
+        
+        # Shell export format for sourcing
+        source <(promptv secrets export --format shell --project moonshoot)
         
         # Exclude provider API keys
-        source <(promptv secrets activate --project moonshoot --no-include-providers)
+        promptv secrets export --project moonshoot --no-include-providers > .env
         
         # JSON output for other tools
-        promptv secrets activate --project moonshoot --format json
-        
-        # Export statements only (no comments)
-        promptv secrets activate --project moonshoot --format export
+        promptv secrets export --project moonshoot --format json
     """
     try:
         manager = SecretsManager()
@@ -1261,11 +1267,11 @@ def secrets_activate(project, output_format, include_providers):
             import json
             click.echo(json.dumps(secrets, indent=2))
         
-        elif output_format == 'export':
+        elif output_format == 'dotenv':
             for key, value in sorted(secrets.items()):
-                click.echo(f'export {key}="{value}"')
+                click.echo(f'{key}={value}')
         
-        else:
+        else:  # shell format
             for key, value in sorted(secrets.items()):
                 click.echo(f'export {key}="{value}"')
             click.echo(f"# Activated {len(secrets)} secret(s) from project '{project}'")
