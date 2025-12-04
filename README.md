@@ -213,8 +213,11 @@ The file is copied from package resources during initialization and never auto-u
    promptv secrets delete DATABASE_URL --project my-app --yes
 
    # Activate secrets in shell (like 'source .env')
-   source <(promptv secrets activate --project moonshoot)
-   eval "$(promptv secrets activate --project moonshoot)"
+   source <(promptv secrets export --format shell --project moonshoot)
+   eval "$(promptv secrets export --project moonshoot)"
+
+   # Convert to .env file
+   promptv secrets export --format dotenv
    ```
 
 9. **diff** - Compare two versions of a prompt
@@ -228,10 +231,10 @@ The file is copied from package resources during initialization and never auto-u
 
 10. **estimate-cost** - Estimate cost of running a prompt
 
-   ```bash
-   promptv estimate-cost prompt-name --model gpt-4 --provider openai
-   promptv estimate-cost prompt-name --output-tokens 1000
-   ```
+```bash
+promptv estimate-cost prompt-name --model gpt-4 --provider openai
+promptv estimate-cost prompt-name --output-tokens 1000
+```
 
 11. **test** - Run API tests with LLM integration
     ```bash
