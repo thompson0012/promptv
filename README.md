@@ -1,6 +1,7 @@
 This project sponsored by [DLS by LABs21](https://dls.labs21.dev/?utm_source=github&utm_medium=banner&utm_campaign=promptv)
 
-<img width="289" height="51" alt="image" src="https://github.com/user-attachments/assets/5eef16c4-a4a4-413f-bc3d-3e2c35d50cc5" />
+<img width="290" height="54" alt="image" src="https://github.com/user-attachments/assets/a9352e6c-3c52-4b6d-89a7-8604a1d85fe7" />
+
 
 If you think this project is helpful, treat me a coffee.
 
