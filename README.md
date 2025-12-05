@@ -42,6 +42,9 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install the package in development mode
 pip install -e .
+
+# Install from Pypi
+pip install promptv==0.1.6 #lock the version to avoid API changes
 ```
 
 ## Configuration
