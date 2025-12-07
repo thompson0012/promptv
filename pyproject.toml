@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "promptv"
-version = "0.1.6.post2"
+version = "0.1.7"
 description = "A comprehensive developer-first prompt management tool with git-like version control"
-readme = "README.md"    
+readme = "README.md"        
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
 authors = [
