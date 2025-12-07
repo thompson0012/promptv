@@ -25,7 +25,8 @@ from .utils import (
     format_cost_estimate,
     format_cost_comparison,
     format_token_count,
-    format_error
+    format_error,
+    is_valid_url
 )
 from .resources import list_available_models, get_pricing_data_date
 from .diff_engine import DiffEngine, DiffFormat
@@ -1838,9 +1839,11 @@ def init(force):
 @click.option('--provider', type=click.Choice(['openai', 'anthropic', 'openrouter']), 
               help='LLM provider to use')
 @click.option('--endpoint', help='Custom endpoint URL (mutually exclusive with --provider)')
+@click.option('--custom-endpoint', help='Custom API endpoint URL (overrides provider defaults)')
+@click.option('--api-key', help='Direct API key (overrides secrets management - USE WITH CAUTION)')
 @click.option('--temperature', type=float, help='Sampling temperature (0.0-2.0)')
 @click.option('--max-tokens', type=int, help='Maximum tokens in response')
-def test(prompt_name, version, project, llm, provider, endpoint, temperature, max_tokens):
+def test(prompt_name, version, project, llm, provider, endpoint, custom_endpoint, api_key, temperature, max_tokens):
     """
     Interactively test a prompt with an LLM provider.
     
@@ -1852,14 +1855,25 @@ def test(prompt_name, version, project, llm, provider, endpoint, temperature, ma
         promptv test greeting-prompt --llm claude-3-5-sonnet-20241022 --provider anthropic
         promptv test creative-prompt --llm openai/gpt-4-turbo --provider openrouter
         promptv test custom-prompt --llm my-model --endpoint http://localhost:8000/v1
+        promptv test custom-prompt --llm my-model --custom-endpoint https://api.example.com/v1/chat --api-key sk-12345
     """
-    # Validate mutual exclusivity of --provider and --endpoint
-    if provider and endpoint:
-        click.echo("Error: --provider and --endpoint are mutually exclusive", err=True)
+    # Validate mutual exclusivity of --provider, --endpoint, and --custom-endpoint
+    if sum(x is not None for x in [provider, endpoint, custom_endpoint]) > 1:
+        click.echo("Error: --provider, --endpoint, and --custom-endpoint are mutually exclusive", err=True)
         sys.exit(1)
     
-    if not provider and not endpoint:
-        click.echo("Error: Either --provider or --endpoint must be specified", err=True)
+    if not provider and not endpoint and not custom_endpoint:
+        click.echo("Error: Either --provider, --endpoint, or --custom-endpoint must be specified", err=True)
+        sys.exit(1)
+    
+    # Validate custom endpoint URL format
+    if custom_endpoint and not is_valid_url(custom_endpoint):
+        click.echo("Error: Invalid URL format for --custom-endpoint", err=True)
+        sys.exit(1)
+    
+    # Validate endpoint URL format
+    if endpoint and not is_valid_url(endpoint):
+        click.echo("Error: Invalid URL format for --endpoint", err=True)
         sys.exit(1)
     
     # Validate temperature range
@@ -1871,6 +1885,10 @@ def test(prompt_name, version, project, llm, provider, endpoint, temperature, ma
     if max_tokens is not None and max_tokens <= 0:
         click.echo("Error: Max tokens must be positive", err=True)
         sys.exit(1)
+    
+    # Security warning for --api-key usage
+    if api_key:
+        click.echo("Warning: Using --api-key exposes your API key in command history. Consider using secrets management.", err=True)
     
     try:
         # Load prompt
@@ -1915,24 +1933,35 @@ def test(prompt_name, version, project, llm, provider, endpoint, temperature, ma
         if endpoint:
             provider_name = 'custom'
             api_key_name = 'custom_api_key'
+        elif custom_endpoint:
+            provider_name = 'custom'
+            api_key_name = 'custom_api_key' if not api_key else None
         else:
             provider_name = provider
             api_key_name = f'{provider}_api_key'
         
-        # Get API key
-        secrets_mgr = SecretsManager()
-        api_key = secrets_mgr.get_api_key(provider_name)
-        
-        if not api_key:
-            click.echo(f"Error: API key not found for provider '{provider_name}'", err=True)
-            click.echo(f"Set your API key with: promptv secrets set {api_key_name}")
-            sys.exit(1)
-        
-        # Create provider
-        if endpoint:
-            provider_instance = create_provider(provider_name, llm, api_key, endpoint)
+        # Get API key - precedence: --api-key > secrets > None
+        if api_key:
+            # Use directly provided API key
+            effective_api_key = api_key
         else:
-            provider_instance = create_provider(provider_name, llm, api_key)
+            # Get from secrets
+            secrets_mgr = SecretsManager()
+            effective_api_key = secrets_mgr.get_api_key(provider_name)
+            
+            if not effective_api_key and not custom_endpoint:
+                click.echo(f"Error: API key not found for provider '{provider_name}'", err=True)
+                click.echo(f"Set your API key with: promptv secrets set {api_key_name}")
+                sys.exit(1)
+        
+        # Create provider - handle custom endpoint vs regular providers
+        if endpoint:
+            provider_instance = create_provider(provider_name, llm, effective_api_key, endpoint)
+        elif custom_endpoint:
+            # Pass custom_endpoint to create_provider for provider-specific handling
+            provider_instance = create_provider(provider_name, llm, effective_api_key, custom_endpoint)
+        else:
+            provider_instance = create_provider(provider_name, llm, effective_api_key)
         
         click.echo(f"Connecting to {provider_name} (model: {llm})...")
         

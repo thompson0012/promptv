@@ -221,13 +221,14 @@ class AnthropicProvider(LLMProvider):
         >>> response, prompt_tokens, completion_tokens, cost = provider.send_message(messages)
     """
     
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, base_url: Optional[str] = None):
         """
         Initialize Anthropic provider.
         
         Args:
             api_key: Anthropic API key
             model: Model name (e.g., "claude-3-5-sonnet-20241022")
+            base_url: Optional custom base URL (default: Anthropic's API)
         """
         try:
             from anthropic import Anthropic
@@ -237,7 +238,10 @@ class AnthropicProvider(LLMProvider):
             ) from e
         
         self.model = model
-        self.client = Anthropic(api_key=api_key)
+        kwargs = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self.client = Anthropic(**kwargs)
         
         # Import cost estimator
         from promptv.cost_estimator import CostEstimator
@@ -356,13 +360,14 @@ class OpenRouterProvider(LLMProvider):
         >>> response, prompt_tokens, completion_tokens, cost = provider.send_message(messages)
     """
     
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, base_url: Optional[str] = None):
         """
         Initialize OpenRouter provider.
         
         Args:
             api_key: OpenRouter API key
             model: Model name (e.g., "openai/gpt-4-turbo", "anthropic/claude-3-opus")
+            base_url: Optional custom base URL (default: OpenRouter's API)
         """
         try:
             from openai import OpenAI
@@ -372,10 +377,11 @@ class OpenRouterProvider(LLMProvider):
             ) from e
         
         self.model = model
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://openrouter.ai/api/v1"
-        )
+        kwargs = {
+            "api_key": api_key,
+            "base_url": base_url if base_url else "https://openrouter.ai/api/v1"
+        }
+        self.client = OpenAI(**kwargs)
         
         # Import cost estimator
         from promptv.cost_estimator import CostEstimator
@@ -513,10 +519,18 @@ def create_provider(
         return OpenAIProvider(api_key=api_key, model=model)
     
     elif provider_name == "anthropic":
-        return AnthropicProvider(api_key=api_key, model=model)
+        # For Anthropic, we can pass a custom endpoint if provided
+        if endpoint:
+            return AnthropicProvider(api_key=api_key, model=model, base_url=endpoint)
+        else:
+            return AnthropicProvider(api_key=api_key, model=model)
     
     elif provider_name == "openrouter":
-        return OpenRouterProvider(api_key=api_key, model=model)
+        # For OpenRouter, we can pass a custom endpoint if provided
+        if endpoint:
+            return OpenRouterProvider(api_key=api_key, model=model, base_url=endpoint)
+        else:
+            return OpenRouterProvider(api_key=api_key, model=model)
     
     elif provider_name == "custom":
         if not endpoint:

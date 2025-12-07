@@ -672,7 +672,9 @@ class PromptClient:
         label: Optional[str] = None,
         project: str = 'default',
         temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        api_key: Optional[str] = None,
+        custom_endpoint: Optional[str] = None
     ) -> None:
         """
         Interactively test a prompt with an LLM provider.
@@ -689,6 +691,8 @@ class PromptClient:
             project: Project name (default: 'default')
             temperature: Sampling temperature (0.0-2.0, optional)
             max_tokens: Maximum tokens in response (optional)
+            api_key: Direct API key (overrides secrets management - USE WITH CAUTION) (optional)
+            custom_endpoint: Custom API endpoint URL (overrides provider defaults) (optional)
         
         Raises:
             PromptNotFoundError: If prompt doesn't exist
@@ -709,6 +713,15 @@ class PromptClient:
             ...     model='claude-3-5-sonnet-20241022',
             ...     version=2,
             ...     temperature=0.7
+            ... )
+            
+            >>> # With custom endpoint and API key
+            >>> client.test_prompt_interactive(
+            ...     name='custom-prompt',
+            ...     provider='openai',
+            ...     model='my-model',
+            ...     custom_endpoint='https://api.example.com/v1/chat',
+            ...     api_key='sk-12345'
             ... )
         """
         # Validate inputs
@@ -739,18 +752,27 @@ class PromptClient:
         else:
             rendered_prompt = prompt_content
         
-        # Get API key from secrets manager
-        api_key = self.secrets_manager.get_api_key(provider)
+        # Get API key - precedence: api_key parameter > secrets > None
+        if api_key:
+            # Use directly provided API key
+            effective_api_key = api_key
+        else:
+            # Get from secrets
+            effective_api_key = self.secrets_manager.get_api_key(provider)
+            
+            if not effective_api_key:
+                raise ValueError(
+                    f"API key not found for provider '{provider}'. "
+                    f"Set your API key with: client.set_api_key('{provider}', 'your-api-key') "
+                    f"or provide it directly with the api_key parameter."
+                )
         
-        if not api_key:
-            raise ValueError(
-                f"API key not found for provider '{provider}'. "
-                f"Set your API key with: client.set_api_key('{provider}', 'your-api-key')"
-            )
-        
-        # Create provider using factory function
+        # Create provider using factory function - handle custom endpoint
         from ..llm_providers import create_provider
-        provider_instance = create_provider(provider, model, api_key)
+        if custom_endpoint:
+            provider_instance = create_provider(provider, model, effective_api_key, custom_endpoint)
+        else:
+            provider_instance = create_provider(provider, model, effective_api_key)
         
         # Create InteractiveTester instance
         from ..interactive_tester import InteractiveTester

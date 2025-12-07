@@ -293,6 +293,9 @@ The file is copied from package resources during initialization and never auto-u
     # Test with custom endpoint
     promptv test custom-prompt --llm my-model --endpoint http://localhost:8000/v1
     
+    # Test with custom endpoint and API key (security warning will be shown)
+    promptv test custom-prompt --llm my-model --custom-endpoint https://api.example.com/v1/chat --api-key sk-12345
+    
     # Test with specific version and parameters
     promptv test my-prompt --llm gpt-4 --provider openai --version 2 --temperature 0.7
     ```

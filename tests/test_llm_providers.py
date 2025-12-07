@@ -4,7 +4,6 @@ Unit tests for LLM providers.
 
 import unittest
 from unittest.mock import patch, MagicMock
-import pytest
 
 from promptv.llm_providers import (
     LLMProvider, OpenAIProvider, AnthropicProvider, OpenRouterProvider, 
@@ -47,6 +46,19 @@ class TestLLMProviders(unittest.TestCase):
         self.assertIsInstance(provider, LLMProvider)
         mock_anthropic.assert_called_once_with(api_key="test-key")
 
+    @patch('promptv.llm_providers.Anthropic')
+    def test_anthropic_provider_with_custom_base_url(self, mock_anthropic):
+        """Test AnthropicProvider with custom base URL."""
+        provider = AnthropicProvider(
+            api_key="test-key", 
+            model="claude-3-5-sonnet-20241022",
+            base_url="https://custom-anthropic.com/v1"
+        )
+        mock_anthropic.assert_called_once_with(
+            api_key="test-key",
+            base_url="https://custom-anthropic.com/v1"
+        )
+
     @patch('promptv.llm_providers.OpenAI')
     def test_openrouter_provider_initialization(self, mock_openai):
         """Test OpenRouterProvider initialization."""
@@ -55,6 +67,19 @@ class TestLLMProviders(unittest.TestCase):
         mock_openai.assert_called_once_with(
             api_key="test-key",
             base_url="https://openrouter.ai/api/v1"
+        )
+
+    @patch('promptv.llm_providers.OpenAI')
+    def test_openrouter_provider_with_custom_base_url(self, mock_openai):
+        """Test OpenRouterProvider with custom base URL."""
+        provider = OpenRouterProvider(
+            api_key="test-key", 
+            model="openai/gpt-4-turbo",
+            base_url="https://custom-openrouter.com/v1"
+        )
+        mock_openai.assert_called_once_with(
+            api_key="test-key",
+            base_url="https://custom-openrouter.com/v1"
         )
 
     def test_create_provider_openai(self):
@@ -69,11 +94,31 @@ class TestLLMProviders(unittest.TestCase):
             provider = create_provider("anthropic", "claude-3-5-sonnet-20241022", "test-key")
             mock_provider.assert_called_once_with(api_key="test-key", model="claude-3-5-sonnet-20241022")
 
+    def test_create_provider_anthropic_with_custom_endpoint(self):
+        """Test create_provider factory for Anthropic with custom endpoint."""
+        with patch('promptv.llm_providers.AnthropicProvider') as mock_provider:
+            provider = create_provider("anthropic", "claude-3-5-sonnet-20241022", "test-key", "https://custom-anthropic.com/v1")
+            mock_provider.assert_called_once_with(
+                api_key="test-key", 
+                model="claude-3-5-sonnet-20241022",
+                base_url="https://custom-anthropic.com/v1"
+            )
+
     def test_create_provider_openrouter(self):
         """Test create_provider factory for OpenRouter."""
         with patch('promptv.llm_providers.OpenRouterProvider') as mock_provider:
             provider = create_provider("openrouter", "openai/gpt-4-turbo", "test-key")
             mock_provider.assert_called_once_with(api_key="test-key", model="openai/gpt-4-turbo")
+
+    def test_create_provider_openrouter_with_custom_endpoint(self):
+        """Test create_provider factory for OpenRouter with custom endpoint."""
+        with patch('promptv.llm_providers.OpenRouterProvider') as mock_provider:
+            provider = create_provider("openrouter", "openai/gpt-4-turbo", "test-key", "https://custom-openrouter.com/v1")
+            mock_provider.assert_called_once_with(
+                api_key="test-key", 
+                model="openai/gpt-4-turbo",
+                base_url="https://custom-openrouter.com/v1"
+            )
 
     def test_create_provider_custom(self):
         """Test create_provider factory for custom endpoint."""

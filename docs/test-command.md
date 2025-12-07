@@ -30,8 +30,14 @@ promptv test my-prompt --llm claude-3-5-sonnet-20241022 --provider anthropic
 # With OpenRouter
 promptv test my-prompt --llm openai/gpt-4-turbo --provider openrouter
 
-# With custom endpoint
+# With custom endpoint (legacy)
 promptv test my-prompt --llm my-model --endpoint http://localhost:8000/v1
+
+# With custom endpoint and API key
+promptv test my-prompt --llm my-model --custom-endpoint https://api.example.com/v1/chat --api-key sk-12345
+
+# With provider and custom endpoint (provider-specific custom endpoint)
+promptv test my-prompt --llm claude-3-5-sonnet-20241022 --provider anthropic --custom-endpoint https://custom-anthropic.com/v1
 ```
 
 ## Supported Providers
@@ -53,12 +59,14 @@ The test command supports the following LLM providers:
 | `--llm`       | Model name to use                              | Yes      | N/A |
 | `--provider`  | LLM provider (`openai`, `anthropic`, `openrouter`) | Conditional* | N/A |
 | `--endpoint`  | Custom endpoint URL                            | Conditional* | N/A |
+| `--custom-endpoint` | Custom API endpoint URL (overrides provider defaults) | Conditional* | N/A |
+| `--api-key`   | Direct API key (overrides secrets management)  | No       | N/A |
 | `--version`   | Specific version to test                       | No       | `latest` |
 | `--project`   | Project name                                   | No       | `default` |
 | `--temperature` | Sampling temperature (0.0-2.0)              | No       | Provider default |
 | `--max-tokens` | Maximum tokens in response                    | No       | Provider default |
 
-*Either `--provider` or `--endpoint` must be specified, but not both.
+*Either `--provider`, `--endpoint`, or `--custom-endpoint` must be specified, but not more than one.
 
 ## Variable Handling
 
@@ -135,6 +143,43 @@ At the end of the session, a summary is displayed:
 └────────────────────┴──────────┘
 ```
 
+## Security Warnings
+
+### Direct API Key Usage
+
+When using the `--api-key` parameter, your API key will be visible in:
+- Command history
+- Process list
+- Shell logs
+- System audit logs
+
+**Example warning message:**
+```
+Warning: Using --api-key exposes your API key in command history. Consider using secrets management.
+```
+
+### Best Practices
+
+1. **Use secrets management for production:**
+   ```bash
+   promptv secrets set openai --provider
+   promptv test my-prompt --llm gpt-4 --provider openai
+   ```
+
+2. **Use environment variables when possible:**
+   ```bash
+   export OPENAI_API_KEY="sk-..."
+   promptv test my-prompt --llm gpt-4 --provider openai
+   ```
+
+3. **Clear shell history after sensitive commands:**
+   ```bash
+   history -d $(history 1)
+   ```
+
+4. **For temporary testing only:**
+   The `--api-key` parameter should only be used for temporary testing purposes.
+
 ## Examples
 
 ### Testing with OpenAI
@@ -158,6 +203,9 @@ promptv test technical-docs-prompt --llm claude-3-5-sonnet-20241022 --provider a
 
 # Test with specific max tokens
 promptv test summarization-prompt --llm claude-3-opus-20240229 --provider anthropic --max-tokens 500
+
+# Test with custom endpoint
+promptv test custom-prompt --llm claude-3-5-sonnet-20241022 --provider anthropic --custom-endpoint https://custom-anthropic.com/v1
 ```
 
 ### Testing with OpenRouter
@@ -168,6 +216,9 @@ promptv test general-prompt --llm openai/gpt-4-turbo --provider openrouter
 
 # Access Claude through OpenRouter
 promptv test analysis-prompt --llm anthropic/claude-3-opus --provider openrouter
+
+# Test with custom endpoint
+promptv test custom-prompt --llm openai/gpt-4-turbo --provider openrouter --custom-endpoint https://custom-openrouter.com/v1
 ```
 
 ### Testing with Custom Endpoints
@@ -178,6 +229,9 @@ promptv test local-prompt --llm llama3 --endpoint http://localhost:8000/v1
 
 # Test with custom hosted model
 promptv test hosted-prompt --llm mistral-7b --endpoint https://api.mycompany.com/v1
+
+# Test with custom endpoint and API key (security warning will be shown)
+promptv test custom-prompt --llm my-model --custom-endpoint https://api.example.com/v1/chat --api-key sk-12345
 ```
 
 ## Troubleshooting
@@ -249,5 +303,14 @@ client.test_prompt_interactive(
     provider='openai',
     model='gpt-4',
     temperature=0.7
+)
+
+# Test with custom endpoint and API key
+client.test_prompt_interactive(
+    name='my-prompt',
+    provider='openai',
+    model='my-model',
+    custom_endpoint='https://api.example.com/v1/chat',
+    api_key='sk-12345'
 )
 ```
