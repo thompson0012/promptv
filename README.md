@@ -278,6 +278,25 @@ The file is copied from package resources during initialization and never auto-u
     promptv variables list prompt-name --label prod
     ```
 
+13. **test** - Interactively test prompts with LLM providers
+
+    ```bash
+    # Test with OpenAI
+    promptv test my-prompt --llm gpt-4 --provider openai
+    
+    # Test with Anthropic
+    promptv test greeting-prompt --llm claude-3-5-sonnet-20241022 --provider anthropic
+    
+    # Test with OpenRouter
+    promptv test creative-prompt --llm openai/gpt-4-turbo --provider openrouter
+    
+    # Test with custom endpoint
+    promptv test custom-prompt --llm my-model --endpoint http://localhost:8000/v1
+    
+    # Test with specific version and parameters
+    promptv test my-prompt --llm gpt-4 --provider openai --version 2 --temperature 0.7
+    ```
+
 ## Secrets Management
 
 promptv provides secure storage for API keys and generic secrets:

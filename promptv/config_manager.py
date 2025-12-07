@@ -64,6 +64,9 @@ llm_providers:
   anthropic:
     api_base_url: "https://api.anthropic.com/v1"
     default_model: "claude-3-5-sonnet-20241022"
+  openrouter:
+    api_base_url: "https://openrouter.ai/api/v1"
+    default_model: "openai/gpt-4-turbo"
   cohere:
     api_base_url: "https://api.cohere.ai/v1"
     default_model: "command-r-plus"

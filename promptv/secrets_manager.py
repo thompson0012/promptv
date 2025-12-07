@@ -50,6 +50,7 @@ class SecretsManager:
     SUPPORTED_PROVIDERS = [
         "openai",
         "anthropic",
+        "openrouter",
         "cohere",
         "huggingface",
         "together",

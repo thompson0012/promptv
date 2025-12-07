@@ -663,6 +663,108 @@ class PromptClient:
         """
         self.secrets_manager.delete_secret(key_name, project=project)
     
+    def test_prompt_interactive(
+        self,
+        name: str,
+        provider: str,
+        model: str,
+        version: Optional[int] = None,
+        label: Optional[str] = None,
+        project: str = 'default',
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None
+    ) -> None:
+        """
+        Interactively test a prompt with an LLM provider.
+        
+        This method loads a saved prompt, extracts variables, prompts the user for values,
+        and starts an interactive chat session with the selected LLM provider.
+        
+        Args:
+            name: Prompt name to test
+            provider: LLM provider to use ('openai', 'anthropic', 'openrouter')
+            model: Model name to use (e.g., 'gpt-4', 'claude-3-5-sonnet-20241022')
+            version: Specific version number to test (optional)
+            label: Label/tag to test (optional)
+            project: Project name (default: 'default')
+            temperature: Sampling temperature (0.0-2.0, optional)
+            max_tokens: Maximum tokens in response (optional)
+        
+        Raises:
+            PromptNotFoundError: If prompt doesn't exist
+            ValueError: If both version and label are specified
+        
+        Examples:
+            >>> client = PromptClient()
+            >>> client.test_prompt_interactive(
+            ...     name='greeting-prompt',
+            ...     provider='openai',
+            ...     model='gpt-4'
+            ... )
+            
+            >>> # With specific version and temperature
+            >>> client.test_prompt_interactive(
+            ...     name='creative-prompt',
+            ...     provider='anthropic',
+            ...     model='claude-3-5-sonnet-20241022',
+            ...     version=2,
+            ...     temperature=0.7
+            ... )
+        """
+        # Validate inputs
+        if version is not None and label is not None:
+            raise ValueError("Cannot specify both version and label")
+        
+        # Resolve prompt version (from version or label)
+        if version is not None:
+            prompt_content = self.manager.get_prompt(name, version=version, project=project)
+        elif label is not None:
+            prompt_content = self.manager.get_prompt(name, label=label, project=project)
+        else:
+            prompt_content = self.manager.get_prompt(name, project=project)
+        
+        # Extract and prompt for variables
+        variables = self.manager.extract_variables(prompt_content)
+        variable_values = {}
+        
+        if variables:
+            print("Detected variables in prompt:")
+            for var in variables:
+                value = input(f"Enter value for '{var}': ")
+                variable_values[var] = value
+        
+        # Render prompt with variables
+        if variable_values:
+            rendered_prompt = self.variable_engine.render(prompt_content, variable_values)
+        else:
+            rendered_prompt = prompt_content
+        
+        # Get API key from secrets manager
+        api_key = self.secrets_manager.get_api_key(provider)
+        
+        if not api_key:
+            raise ValueError(
+                f"API key not found for provider '{provider}'. "
+                f"Set your API key with: client.set_api_key('{provider}', 'your-api-key')"
+            )
+        
+        # Create provider using factory function
+        from ..llm_providers import create_provider
+        provider_instance = create_provider(provider, model, api_key)
+        
+        # Create InteractiveTester instance
+        from ..interactive_tester import InteractiveTester
+        tester = InteractiveTester(
+            provider=provider_instance,
+            initial_prompt=rendered_prompt,
+            show_costs=True,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        
+        # Start interactive session
+        tester.start_session()
+
     def list_secrets(self, project: Optional[str] = None) -> Dict[str, Any]:
         """
         List all secrets grouped by type and project.

@@ -107,6 +107,12 @@ class LLMProvidersConfig(BaseModel):
             default_model="claude-3-5-sonnet-20241022"
         )
     )
+    openrouter: LLMProviderConfig = Field(
+        default_factory=lambda: LLMProviderConfig(
+            api_base_url="https://openrouter.ai/api/v1",
+            default_model="openai/gpt-4-turbo"
+        )
+    )
     cohere: LLMProviderConfig = Field(
         default_factory=lambda: LLMProviderConfig(
             api_base_url="https://api.cohere.ai/v1",

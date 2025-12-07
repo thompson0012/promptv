@@ -29,6 +29,8 @@ from .utils import (
 )
 from .resources import list_available_models, get_pricing_data_date
 from .diff_engine import DiffEngine, DiffFormat
+from .llm_providers import create_provider, LLMProviderError, APIKeyError, APIError, NetworkError
+from .interactive_tester import InteractiveTester
 
 
 @click.group()
@@ -1822,6 +1824,156 @@ def init(force):
         click.echo()
         click.echo("  3. Customize pricing (optional):")
         click.echo("     Edit ~/.promptv/.config/pricing.yaml")
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument('prompt_name', type=str)
+@click.option('--version', default='latest', help='Version to test (default: latest)')
+@click.option('--project', default='default', help='Project name (default: default)')
+@click.option('--llm', required=True, help='Model name to use (e.g., gpt-4, claude-3-5-sonnet-20241022)')
+@click.option('--provider', type=click.Choice(['openai', 'anthropic', 'openrouter']), 
+              help='LLM provider to use')
+@click.option('--endpoint', help='Custom endpoint URL (mutually exclusive with --provider)')
+@click.option('--temperature', type=float, help='Sampling temperature (0.0-2.0)')
+@click.option('--max-tokens', type=int, help='Maximum tokens in response')
+def test(prompt_name, version, project, llm, provider, endpoint, temperature, max_tokens):
+    """
+    Interactively test a prompt with an LLM provider.
+    
+    This command loads a saved prompt, substitutes variables by prompting the user,
+    and starts an interactive chat session with the selected LLM provider.
+    
+    Examples:
+        promptv test my-prompt --llm gpt-4 --provider openai
+        promptv test greeting-prompt --llm claude-3-5-sonnet-20241022 --provider anthropic
+        promptv test creative-prompt --llm openai/gpt-4-turbo --provider openrouter
+        promptv test custom-prompt --llm my-model --endpoint http://localhost:8000/v1
+    """
+    # Validate mutual exclusivity of --provider and --endpoint
+    if provider and endpoint:
+        click.echo("Error: --provider and --endpoint are mutually exclusive", err=True)
+        sys.exit(1)
+    
+    if not provider and not endpoint:
+        click.echo("Error: Either --provider or --endpoint must be specified", err=True)
+        sys.exit(1)
+    
+    # Validate temperature range
+    if temperature is not None and (temperature < 0.0 or temperature > 2.0):
+        click.echo("Error: Temperature must be between 0.0 and 2.0", err=True)
+        sys.exit(1)
+    
+    # Validate max_tokens is positive
+    if max_tokens is not None and max_tokens <= 0:
+        click.echo("Error: Max tokens must be positive", err=True)
+        sys.exit(1)
+    
+    try:
+        # Load prompt
+        manager = PromptManager()
+        
+        # Check if prompt exists
+        if not manager.prompt_exists(prompt_name, project=project):
+            click.echo(f"Error: Prompt '{prompt_name}' not found in project '{project}'", err=True)
+            click.echo(f"Run 'promptv list --project {project}' to see available prompts")
+            click.echo(f"Create with 'promptv commit --source file.md --name {prompt_name} --project {project}'")
+            sys.exit(1)
+        
+        # Load prompt content
+        if version == 'latest':
+            prompt_content = manager.get_prompt(prompt_name, project=project)
+        else:
+            try:
+                version_num = int(version)
+                prompt_content = manager.get_prompt(prompt_name, version=version_num, project=project)
+            except ValueError:
+                # Assume it's a label/tag
+                prompt_content = manager.get_prompt(prompt_name, label=version, project=project)
+        
+        # Extract and prompt for variables
+        variables = manager.extract_variables(prompt_content)
+        variable_values = {}
+        
+        if variables:
+            click.echo("Detected variables in prompt:")
+            for var in variables:
+                value = click.prompt(f"Enter value for '{var}'")
+                variable_values[var] = value
+        
+        # Render prompt with variables
+        if variable_values:
+            engine = VariableEngine()
+            rendered_prompt = engine.render(prompt_content, variable_values)
+        else:
+            rendered_prompt = prompt_content
+        
+        # Determine provider name and API key
+        if endpoint:
+            provider_name = 'custom'
+            api_key_name = 'custom_api_key'
+        else:
+            provider_name = provider
+            api_key_name = f'{provider}_api_key'
+        
+        # Get API key
+        secrets_mgr = SecretsManager()
+        api_key = secrets_mgr.get_api_key(provider_name)
+        
+        if not api_key:
+            click.echo(f"Error: API key not found for provider '{provider_name}'", err=True)
+            click.echo(f"Set your API key with: promptv secrets set {api_key_name}")
+            sys.exit(1)
+        
+        # Create provider
+        if endpoint:
+            provider_instance = create_provider(provider_name, llm, api_key, endpoint)
+        else:
+            provider_instance = create_provider(provider_name, llm, api_key)
+        
+        click.echo(f"Connecting to {provider_name} (model: {llm})...")
+        
+        # Create and start interactive tester
+        tester = InteractiveTester(
+            provider=provider_instance,
+            initial_prompt=rendered_prompt,
+            show_costs=True,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        
+        tester.start_session()
+        
+    except VersionNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        available_versions = e.available_versions
+        if available_versions:
+            click.echo("Available versions:", err=True)
+            for ver in available_versions:
+                click.echo(f"  - {ver}", err=True)
+        sys.exit(1)
+        
+    except APIKeyError as e:
+        click.echo(f"Error: {e}", err=True)
+        click.echo("Please check your API key and try again.", err=True)
+        sys.exit(2)
+        
+    except APIError as e:
+        click.echo(f"Error: {e}", err=True)
+        click.echo("The API returned an error. Please try again.", err=True)
+        sys.exit(2)
+        
+    except NetworkError as e:
+        click.echo(f"Error: {e}", err=True)
+        click.echo("Please check your internet connection and try again.", err=True)
+        sys.exit(2)
+        
+    except KeyboardInterrupt:
+        click.echo("\nSession cancelled by user.")
+        sys.exit(0)
         
     except Exception as e:
         click.echo(f"Error: {e}", err=True)

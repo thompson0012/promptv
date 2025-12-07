@@ -16,6 +16,9 @@ setup(
         'rich>=13.9.4',
         'tiktoken>=0.8.0',
         'textual>=0.84.0',
+        'openai>=1.0.0',
+        'anthropic>=0.18.0',
+        'httpx>=0.25.0',
     ],
     entry_points={
         'console_scripts': [
