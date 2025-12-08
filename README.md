@@ -44,7 +44,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e .
 
 # Install from Pypi
-pip install promptv==0.1.6 #lock the version to avoid API changes
+pip install promptv==0.1.7 #lock the version to avoid API changes
 ```
 
 ## Configuration
