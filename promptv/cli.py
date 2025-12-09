@@ -1305,21 +1305,23 @@ def cost():
 @click.option('--model', '-m', default='gpt-4', help='Model name (default: gpt-4)')
 @click.option('--provider', '-p', default='openai', help='Provider name (default: openai)')
 @click.option('--output-tokens', '-o', type=int, default=500, help='Estimated output tokens (default: 500)')
-def cost_estimate(prompt_name, version, label, var, model, provider, output_tokens):
+@click.option('--project', default='default', help='Project name (default: default)')
+def cost_estimate(prompt_name, version, label, var, model, provider, output_tokens, project):
     """
     Estimate the cost of running a prompt.
-    
+
     Examples:
         promptv cost estimate my-prompt
         promptv cost estimate my-prompt --label prod
         promptv cost estimate my-prompt --model gpt-3.5-turbo
         promptv cost estimate my-prompt --var name=Alice --var city=NYC
         promptv cost estimate my-prompt -m claude-3-sonnet -p anthropic -o 1000
+        promptv cost estimate my-prompt --project my-app
     """
     try:
         manager = PromptManager()
         var_engine = VariableEngine()
-        
+
         # Parse variables
         variables = {}
         for v in var:
@@ -1328,24 +1330,24 @@ def cost_estimate(prompt_name, version, label, var, model, provider, output_toke
                 sys.exit(1)
             key, value = v.split('=', 1)
             variables[key.strip()] = value.strip()
-        
+
         # Get prompt content
         if label:
             tag_manager = TagManager(manager.prompts_dir)
-            metadata_obj = manager._load_metadata(prompt_name)
+            metadata_obj = manager._load_metadata(prompt_name, project=project)
             if not metadata_obj.versions:
                 raise PromptNotFoundError(prompt_name)
-            version_num = tag_manager.resolve_version(prompt_name, label, metadata_obj.current_version)
-            content, metadata = manager.get_prompt_with_metadata(prompt_name, str(version_num))
+            version_num = tag_manager.resolve_version(prompt_name, label, metadata_obj.current_version, project=project)
+            content, metadata = manager.get_prompt_with_metadata(prompt_name, str(version_num), project=project)
         elif version:
-            content, metadata = manager.get_prompt_with_metadata(prompt_name, version)
+            content, metadata = manager.get_prompt_with_metadata(prompt_name, version, project=project)
         else:
-            content, metadata = manager.get_prompt_with_metadata(prompt_name)
-        
+            content, metadata = manager.get_prompt_with_metadata(prompt_name, project=project)
+
         # Render with variables if provided
         if variables:
             content = var_engine.render(content, variables)
-        
+
         # Estimate cost
         estimator = CostEstimator()
         cost = estimator.estimate_cost(
@@ -1354,10 +1356,10 @@ def cost_estimate(prompt_name, version, label, var, model, provider, output_toke
             provider=provider,
             estimated_output_tokens=output_tokens
         )
-        
+
         # Display result
         format_cost_estimate(cost, show_detail=True)
-        
+
     except PromptNotFoundError as e:
         format_error(str(e), "Use 'promptv list' to see available prompts")
         sys.exit(1)
@@ -1382,20 +1384,22 @@ def cost_estimate(prompt_name, version, label, var, model, provider, output_toke
 @click.option('--var', '-d', multiple=True, help='Variables in key=value format (can be used multiple times)')
 @click.option('--model', '-m', default='gpt-4', help='Model name (default: gpt-4)')
 @click.option('--provider', '-p', default='openai', help='Provider name (default: openai)')
-def cost_tokens(prompt_name, version, label, var, model, provider):
+@click.option('--project', default='default', help='Project name (default: default)')
+def cost_tokens(prompt_name, version, label, var, model, provider, project):
     """
     Count tokens in a prompt.
-    
+
     Examples:
         promptv cost tokens my-prompt
         promptv cost tokens my-prompt --label prod
         promptv cost tokens my-prompt --model gpt-3.5-turbo
         promptv cost tokens my-prompt --var name=Alice
+        promptv cost tokens my-prompt --project my-app
     """
     try:
         manager = PromptManager()
         var_engine = VariableEngine()
-        
+
         # Parse variables
         variables = {}
         for v in var:
@@ -1404,31 +1408,31 @@ def cost_tokens(prompt_name, version, label, var, model, provider):
                 sys.exit(1)
             key, value = v.split('=', 1)
             variables[key.strip()] = value.strip()
-        
+
         # Get prompt content
         if label:
             tag_manager = TagManager(manager.prompts_dir)
-            metadata_obj = manager._load_metadata(prompt_name)
+            metadata_obj = manager._load_metadata(prompt_name, project=project)
             if not metadata_obj.versions:
                 raise PromptNotFoundError(prompt_name)
-            version_num = tag_manager.resolve_version(prompt_name, label, metadata_obj.current_version)
-            content, metadata = manager.get_prompt_with_metadata(prompt_name, str(version_num))
+            version_num = tag_manager.resolve_version(prompt_name, label, metadata_obj.current_version, project=project)
+            content, metadata = manager.get_prompt_with_metadata(prompt_name, str(version_num), project=project)
         elif version:
-            content, metadata = manager.get_prompt_with_metadata(prompt_name, version)
+            content, metadata = manager.get_prompt_with_metadata(prompt_name, version, project=project)
         else:
-            content, metadata = manager.get_prompt_with_metadata(prompt_name)
-        
+            content, metadata = manager.get_prompt_with_metadata(prompt_name, project=project)
+
         # Render with variables if provided
         if variables:
             content = var_engine.render(content, variables)
-        
+
         # Count tokens
         estimator = CostEstimator()
         count = estimator.count_tokens(content, model, provider)
-        
+
         # Display result
         format_token_count(count, model, provider)
-        
+
     except PromptNotFoundError as e:
         format_error(str(e), "Use 'promptv list' to see available prompts")
         sys.exit(1)
@@ -1453,19 +1457,21 @@ def cost_tokens(prompt_name, version, label, var, model, provider):
 @click.option('--var', '-d', multiple=True, help='Variables in key=value format (can be used multiple times)')
 @click.option('--models', '-m', multiple=True, help='Models to compare in provider/model format (e.g., openai/gpt-4)')
 @click.option('--output-tokens', '-o', type=int, default=500, help='Estimated output tokens (default: 500)')
-def cost_compare(prompt_name, version, label, var, models, output_tokens):
+@click.option('--project', default='default', help='Project name (default: default)')
+def cost_compare(prompt_name, version, label, var, models, output_tokens, project):
     """
     Compare costs across multiple models.
-    
+
     Examples:
         promptv cost compare my-prompt -m openai/gpt-4 -m openai/gpt-3.5-turbo
         promptv cost compare my-prompt --label prod -m anthropic/claude-3-sonnet -m openai/gpt-4
         promptv cost compare my-prompt --var name=Alice -m openai/gpt-4o -m google/gemini-1.5-pro
+        promptv cost compare my-prompt -m openai/gpt-4 -m anthropic/claude-3-sonnet --project my-app
     """
     try:
         manager = PromptManager()
         var_engine = VariableEngine()
-        
+
         # Parse variables
         variables = {}
         for v in var:
@@ -1474,24 +1480,24 @@ def cost_compare(prompt_name, version, label, var, models, output_tokens):
                 sys.exit(1)
             key, value = v.split('=', 1)
             variables[key.strip()] = value.strip()
-        
+
         # Get prompt content
         if label:
             tag_manager = TagManager(manager.prompts_dir)
-            metadata_obj = manager._load_metadata(prompt_name)
+            metadata_obj = manager._load_metadata(prompt_name, project=project)
             if not metadata_obj.versions:
                 raise PromptNotFoundError(prompt_name)
-            version_num = tag_manager.resolve_version(prompt_name, label, metadata_obj.current_version)
-            content, metadata = manager.get_prompt_with_metadata(prompt_name, str(version_num))
+            version_num = tag_manager.resolve_version(prompt_name, label, metadata_obj.current_version, project=project)
+            content, metadata = manager.get_prompt_with_metadata(prompt_name, str(version_num), project=project)
         elif version:
-            content, metadata = manager.get_prompt_with_metadata(prompt_name, version)
+            content, metadata = manager.get_prompt_with_metadata(prompt_name, version, project=project)
         else:
-            content, metadata = manager.get_prompt_with_metadata(prompt_name)
-        
+            content, metadata = manager.get_prompt_with_metadata(prompt_name, project=project)
+
         # Render with variables if provided
         if variables:
             content = var_engine.render(content, variables)
-        
+
         # Parse model specifications or use defaults
         if models:
             model_list = []
@@ -1510,14 +1516,14 @@ def cost_compare(prompt_name, version, label, var, models, output_tokens):
                 ('anthropic', 'claude-3-opus-20240229'),
                 ('anthropic', 'claude-3-sonnet-20240229')
             ]
-        
+
         # Compare costs
         estimator = CostEstimator()
         comparisons = estimator.compare_costs(content, model_list, output_tokens)
-        
+
         # Display results
         format_cost_comparison(comparisons)
-        
+
     except PromptNotFoundError as e:
         format_error(str(e), "Use 'promptv list' to see available prompts")
         sys.exit(1)
