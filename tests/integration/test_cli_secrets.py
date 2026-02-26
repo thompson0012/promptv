@@ -27,19 +27,19 @@ def runner():
 
 
 class TestSecretsExportCommand:
-    """Test suite for `promptv secrets export` command."""
-    
+    """Test suite for `promptv secret export` command."""
+
     def test_export_default_project_dotenv_format(self, runner, temp_promptv_dir, monkeypatch):
         """Test exporting default project with dotenv format (default)."""
         secrets_dir = temp_promptv_dir / ".promptv" / ".secrets"
         monkeypatch.setenv("HOME", str(temp_promptv_dir))
-        
+
         manager = SecretsManager(secrets_dir=secrets_dir)
         manager.set_api_key("openai", "sk-test-key")
         manager.set_secret("DATABASE_URL", "postgres://localhost/db")
         manager.set_secret("API_KEY", "abc123")
-        
-        result = runner.invoke(cli, ['secrets', 'export'])
+
+        result = runner.invoke(cli, ['secret', 'export'])
         
         assert result.exit_code == 0
         assert 'OPENAI_API_KEY=sk-test-key' in result.output
@@ -59,7 +59,7 @@ class TestSecretsExportCommand:
         manager.set_secret("REDIS_URL", "redis://localhost", project="app1")
         manager.set_secret("OTHER_KEY", "other", project="app2")
         
-        result = runner.invoke(cli, ['secrets', 'export', '--project', 'app1'])
+        result = runner.invoke(cli, ['secret', 'export', '--project', 'app1'])
         
         assert result.exit_code == 0
         assert 'OPENAI_API_KEY=sk-test-key' in result.output
@@ -78,7 +78,7 @@ class TestSecretsExportCommand:
         manager.set_secret("DATABASE_URL", "postgres://localhost/db")
         manager.set_secret("API_KEY", "abc123")
         
-        result = runner.invoke(cli, ['secrets', 'export', '--format', 'dotenv'])
+        result = runner.invoke(cli, ['secret', 'export', '--format', 'dotenv'])
         
         assert result.exit_code == 0
         assert 'DATABASE_URL=postgres://localhost/db' in result.output
@@ -96,7 +96,7 @@ class TestSecretsExportCommand:
         manager.set_secret("DATABASE_URL", "postgres://localhost/db")
         manager.set_secret("API_KEY", "abc123")
         
-        result = runner.invoke(cli, ['secrets', 'export', '--format', 'json'])
+        result = runner.invoke(cli, ['secret', 'export', '--format', 'json'])
         
         assert result.exit_code == 0
         
@@ -113,7 +113,7 @@ class TestSecretsExportCommand:
         manager.set_secret("DATABASE_URL", "postgres://localhost/db")
         manager.set_secret("API_KEY", "abc123")
         
-        result = runner.invoke(cli, ['secrets', 'export', '--format', 'shell'])
+        result = runner.invoke(cli, ['secret', 'export', '--format', 'shell'])
         
         assert result.exit_code == 0
         assert 'export DATABASE_URL="postgres://localhost/db"' in result.output
@@ -131,7 +131,7 @@ class TestSecretsExportCommand:
         manager.set_secret("DATABASE_URL", "postgres://localhost/db")
         
         result = runner.invoke(cli, [
-            'secrets', 'export', 
+            'secret', 'export',
             '--no-include-providers'
         ])
         
@@ -150,7 +150,7 @@ class TestSecretsExportCommand:
         manager.set_secret("DATABASE_URL", "postgres://db", project="app1")
         
         result = runner.invoke(cli, [
-            'secrets', 'export', 
+            'secret', 'export',
             '--project', 'app2',
             '--no-include-providers'
         ])
@@ -168,7 +168,7 @@ class TestSecretsExportCommand:
         manager.set_api_key("anthropic", "sk-ant")
         manager.set_api_key("google", "google-key")
         
-        result = runner.invoke(cli, ['secrets', 'export'])
+        result = runner.invoke(cli, ['secret', 'export'])
         
         assert result.exit_code == 0
         assert 'OPENAI_API_KEY=sk-openai' in result.output
@@ -187,7 +187,7 @@ class TestSecretsExportCommand:
         manager.set_secret("REDIS_URL", "redis://localhost", project="app1")
         
         result = runner.invoke(cli, [
-            'secrets', 'export', 
+            'secret', 'export',
             '--project', 'app1',
             '--no-include-providers'
         ])
@@ -208,7 +208,7 @@ class TestSecretsExportCommand:
         manager.set_secret("APPLE", "a")
         manager.set_secret("MONGO", "m")
         
-        result = runner.invoke(cli, ['secrets', 'export', '--format', 'dotenv'])
+        result = runner.invoke(cli, ['secret', 'export', '--format', 'dotenv'])
         
         assert result.exit_code == 0
         

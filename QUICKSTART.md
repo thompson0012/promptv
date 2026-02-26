@@ -35,18 +35,18 @@ This creates:
 
 ```bash
 # Set provider API key (for OpenAI, Anthropic, etc.)
-promptv secrets set openai --provider
+promptv secret set openai --provider
 
 # Set generic secrets (with optional project scoping)
-promptv secrets set DATABASE_URL
-promptv secrets set API_KEY --project my-app
+promptv secret set DATABASE_URL
+promptv secret set API_KEY --project my-app
 
 # List all secrets
-promptv secrets list
+promptv secret list
 
 # Activate secrets in your shell (like 'source .env')
-source <(promptv secrets activate)
-source <(promptv secrets activate --project my-app)
+source <(promptv secret activate)
+source <(promptv secret activate --project my-app)
 ```
 
 ### 2. Create Your First Prompt
@@ -55,13 +55,13 @@ source <(promptv secrets activate --project my-app)
 
 ```bash
 # Create a simple prompt (saved to /default)
-promptv set greeting -c "Hello, {{name}}!"
+promptv prompt set greeting -c "Hello, {{name}}!"
 
 # Create a more complex prompt with multiple variables
-promptv set welcome-email -c "Hello {{user_name}}, welcome to {{product}}!"
+promptv prompt set welcome-email -c "Hello {{user_name}}, welcome to {{product}}!"
 
 # Create a prompt in a specific project
-promptv set api-prompt -c "API request template" --project my-app
+promptv prompt set api-prompt -c "API request template" --project my-app
 ```
 
 ### 3. Tag Versions
@@ -83,29 +83,29 @@ promptv tag create welcome-email prod --project my-app --description "Production
 
 ```bash
 # Get prompt by tag
-promptv get welcome-email --label prod
+promptv prompt get welcome-email --label prod
 
 # Render with variables
 promptv render welcome-email --var user_name=Alice --var product=PromptV
 
 # Get by tag and render in one command
-promptv get welcome-email --label prod --var user_name=Bob --var product="PromptV CLI"
+promptv prompt get welcome-email --label prod --var user_name=Bob --var product="PromptV CLI"
 ```
 
 ### 5. List and Inspect
 
 ```bash
 # List all prompts
-promptv list
+promptv prompt list
 
 # List prompts in a specific project
-promptv list --project my-app
+promptv prompt list --project my-app
 
 # List with tags and variables
-promptv list --show-tags --show-variables
+promptv prompt list --show-tags --show-variables
 
 # Show variables in a prompt
-promptv variables list welcome-email
+promptv variable list welcome-email
 
 # Show all tags
 promptv tag list welcome-email
@@ -325,24 +325,24 @@ promptv playground my-prompt
 
 ```bash
 # Set API key (stored securely)
-promptv secrets set openai --provider
+promptv secret set openai --provider
 # Enter your API key: [input hidden]
 
 # Set generic secrets
-promptv secrets set DATABASE_URL
-promptv secrets set API_KEY --project my-app
+promptv secret set DATABASE_URL
+promptv secret set API_KEY --project my-app
 
 # List configured secrets
-promptv secrets list
+promptv secret list
 
 # Test if key exists
-promptv secrets test openai
+promptv secret test openai
 
 # Delete API key
-promptv secrets delete openai --provider
+promptv secret delete openai --provider
 
 # Activate secrets in shell (like 'source .env')
-source <(promptv secrets activate --project my-app)
+source <(promptv secret activate --project my-app)
 ```
 
 ### Shell Function Helper
@@ -352,7 +352,7 @@ Add this to your `~/.bashrc` or `~/.zshrc` for convenient secret activation:
 ```bash
 # Convenient alias for activating secrets
 promptv-activate() {
-    eval "$(promptv secrets activate --project ${1:-default})"
+    eval "$(promptv secret activate --project ${1:-default})"
 }
 
 # Usage examples:
@@ -389,19 +389,19 @@ API keys are stored securely in:
 
 ```bash
 # 1. Create initial prompt
- promptv set my-prompt -c "Your prompt here with {{variable}}"
+ promptv prompt set my-prompt -c "Your prompt here with {{variable}}"
 
 # 2. Tag as development
  promptv tag create my-prompt dev
 
 # 3. Update prompt
- promptv set my-prompt -c "Updated prompt with {{variable}}"
+ promptv prompt set my-prompt -c "Updated prompt with {{variable}}"
 
 # 4. Tag as staging
  promptv tag create my-prompt staging
 
 # 5. Test in staging
- promptv get my-prompt --label staging --var variable=test
+ promptv prompt get my-prompt --label staging --var variable=test
 
 # 6. Promote to production
  promptv tag create my-prompt prod
@@ -541,10 +541,10 @@ print(staging_version)
 
 ```bash
 # Don't hardcode values
- promptv set bad-prompt -c "Hello Alice, welcome to MyApp!"
+ promptv prompt set bad-prompt -c "Hello Alice, welcome to MyApp!"
 
 # Use variables instead
- promptv set good-prompt -c "Hello {{name}}, welcome to {{app}}!"
+ promptv prompt set good-prompt -c "Hello {{name}}, welcome to {{app}}!"
 ```
 
 ### 3. Use Context Managers in Long-Running Apps
@@ -619,7 +619,7 @@ uv run pytest tests/unit/test_sdk_client.py -v
 
 # Command-specific help
  promptv tag --help
- promptv secrets --help
+ promptv secret --help
 
 # Check version
  promptv --version

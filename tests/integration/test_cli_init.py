@@ -212,7 +212,7 @@ class TestAutoInitialization:
         assert not promptv_dir.exists()
         
         # Run any command (not init)
-        result = runner.invoke(cli, ['secrets', 'list'])
+        result = runner.invoke(cli, ['secret', 'list'])
         
         # Should succeed and create structure
         assert result.exit_code == 0

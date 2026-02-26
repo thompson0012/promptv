@@ -132,59 +132,59 @@ The file is copied from package resources during initialization and never auto-u
    promptv init --force            # Delete and recreate (WARNING: destructive!)
    ```
 
-1. **commit** - Save a prompt file with a specific name
+1. **prompt commit** - Save a prompt file with a specific name
 
    ```bash
-   promptv commit --source file.md --name prompt-name                    # Saves to /default project
-   promptv commit --source file.md --name prompt-name -m "Update message"
-   promptv commit --source file.md --name prompt-name --tag prod
-   promptv commit --source file.md --name prompt-name --project my-app   # Saves to /my-app project
+   promptv prompt commit --source file.md --name prompt-name                    # Saves to /default project
+   promptv prompt commit --source file.md --name prompt-name -m "Update message"
+   promptv prompt commit --source file.md --name prompt-name --tag prod
+   promptv prompt commit --source file.md --name prompt-name --project my-app   # Saves to /my-app project
    ```
 
-2. **set** - Set/update a prompt with the given name
+2. **prompt set** - Set/update a prompt with the given name
 
    ```bash
-   promptv set prompt-name --file file.txt                 # Saves to /default project
-   promptv set prompt-name --content "Prompt content"
-   echo "Content" | promptv set prompt-name
-   promptv set prompt-name --file file.txt --project my-app  # Saves to /my-app project
+   promptv prompt set prompt-name --file file.txt                 # Saves to /default project
+   promptv prompt set prompt-name --content "Prompt content"
+   echo "Content" | promptv prompt set prompt-name
+   promptv prompt set prompt-name --file file.txt --project my-app  # Saves to /my-app project
    ```
 
-3. **edit** - Edit a prompt directly in your terminal editor
+3. **prompt edit** - Edit a prompt directly in your terminal editor
 
    ```bash
-   promptv edit prompt-name
-   promptv edit prompt-name --version 2
-   promptv edit prompt-name -m "Updated instructions"
-   promptv edit prompt-name --editor vim
+   promptv prompt edit prompt-name
+   promptv prompt edit prompt-name --version 2
+   promptv prompt edit prompt-name -m "Updated instructions"
+   promptv prompt edit prompt-name --editor vim
    ```
 
-4. **get** - Retrieve a specific version of a prompt
+4. **prompt get** - Retrieve a specific version of a prompt
 
    ```bash
-   promptv get prompt-name --version latest
-   promptv get prompt-name --version 1
-   promptv get prompt-name --label prod
+   promptv prompt get prompt-name --version latest
+   promptv prompt get prompt-name --version 1
+   promptv prompt get prompt-name --label prod
 
    # Variable substitution - space-separated key=value pairs
-   promptv get prompt-name --var "name=Alice count=5"
+   promptv prompt get prompt-name --var "name=Alice count=5"
 
    # Multiple --var flags also supported
-   promptv get prompt-name --var key1=val1 --var key2=val2
+   promptv prompt get prompt-name --var key1=val1 --var key2=val2
    ```
 
-5. **list** - List all versions and metadata for a prompt
+5. **prompt list** - List all versions and metadata for a prompt
 
    ```bash
-   promptv list prompt-name
+   promptv prompt list prompt-name
    ```
 
-6. **remove** - Remove one or more prompts
+6. **prompt remove** - Remove one or more prompts
 
    ```bash
-   promptv remove prompt-name
-   promptv remove prompt1 prompt2 prompt3
-   promptv remove prompt-name --yes  # Skip confirmation
+   promptv prompt remove prompt-name
+   promptv prompt remove prompt1 prompt2 prompt3
+   promptv prompt remove prompt-name --yes  # Skip confirmation
    ```
 
 7. **tag** - Manage tags/labels for versions
@@ -199,40 +199,40 @@ The file is copied from package resources during initialization and never auto-u
    promptv tag delete prompt-name tag-name --project my-app --yes
    ```
 
-8. **secrets** - Manage API keys and secrets securely
+8. **secret** - Manage API keys and secrets securely
 
    ```bash
    # Set provider API key (validated against supported providers)
-   promptv secrets set openai --provider
-   promptv secrets set anthropic --provider
+   promptv secret set openai --provider
+   promptv secret set anthropic --provider
 
    # Set generic secret (default project)
-   promptv secrets set DATABASE_URL
-   promptv secrets set MY_API_KEY
+   promptv secret set DATABASE_URL
+   promptv secret set MY_API_KEY
 
    # Set project-scoped secret
-   promptv secrets set DATABASE_URL --project my-app
-   promptv secrets set REDIS_URL --project moonshoot
+   promptv secret set DATABASE_URL --project my-app
+   promptv secret set REDIS_URL --project moonshoot
 
    # Get secret
-   promptv secrets get openai --provider          # Shows masked (last 4 chars)
-   promptv secrets get DATABASE_URL               # Shows full value
-   promptv secrets get API_KEY --project my-app   # Get from specific project
+   promptv secret get openai --provider          # Shows masked (last 4 chars)
+   promptv secret get DATABASE_URL               # Shows full value
+   promptv secret get API_KEY --project my-app   # Get from specific project
 
    # List all secrets
-   promptv secrets list                           # All secrets
-   promptv secrets list --project my-app          # Filter by project
+   promptv secret list                           # All secrets
+   promptv secret list --project my-app          # Filter by project
 
    # Delete secret
-   promptv secrets delete openai --provider
-   promptv secrets delete DATABASE_URL --project my-app --yes
+   promptv secret delete openai --provider
+   promptv secret delete DATABASE_URL --project my-app --yes
 
    # Export secrets in shell (like 'source .env')
-   source <(promptv secrets export --format shell --project moonshoot)
-   eval "$(promptv secrets export --format shell --project moonshoot)"
+   source <(promptv secret export --format shell --project moonshoot)
+   eval "$(promptv secret export --format shell --project moonshoot)"
 
    # Convert to .env file
-   promptv secrets export --format dotenv
+   promptv secret export --format dotenv
    ```
 
 9. **diff** - Compare two versions of a prompt
@@ -270,12 +270,12 @@ The file is copied from package resources during initialization and never auto-u
     promptv render prompt-name --project my-app --var name=Bob
     ```
 
-12. **variables** - Manage and inspect variables in prompts
+12. **variable** - Manage and inspect variables in prompts
 
     ```bash
-    promptv variables list prompt-name
-    promptv variables list prompt-name --version 2
-    promptv variables list prompt-name --label prod
+    promptv variable list prompt-name
+    promptv variable list prompt-name --version 2
+    promptv variable list prompt-name --label prod
     ```
 
 13. **test** - Interactively test prompts with LLM providers
@@ -310,14 +310,14 @@ Store API keys for supported LLM providers (openai, anthropic, cohere, etc.):
 
 ```bash
 # Set provider API key (validated)
-promptv secrets set openai --provider
-promptv secrets set anthropic --provider
+promptv secret set openai --provider
+promptv secret set anthropic --provider
 
 # Get provider key (shows last 4 chars only)
-promptv secrets get openai --provider
+promptv secret get openai --provider
 
 # Delete provider key
-promptv secrets delete openai --provider
+promptv secret delete openai --provider
 ```
 
 ### Generic Secrets
@@ -326,23 +326,23 @@ Store any secrets with optional project scoping:
 
 ```bash
 # Default project
-promptv secrets set DATABASE_URL
-promptv secrets set API_KEY
+promptv secret set DATABASE_URL
+promptv secret set API_KEY
 
 # Project-scoped
-promptv secrets set DATABASE_URL --project my-app
-promptv secrets set REDIS_URL --project moonshoot
+promptv secret set DATABASE_URL --project my-app
+promptv secret set REDIS_URL --project moonshoot
 
 # Retrieve secrets
-promptv secrets get DATABASE_URL
-promptv secrets get API_KEY --project my-app
+promptv secret get DATABASE_URL
+promptv secret get API_KEY --project my-app
 ```
 
 ### Listing Secrets
 
 ```bash
 # List all secrets
-promptv secrets list
+promptv secret list
 
 # Example output:
 # Provider API Keys:
@@ -359,7 +359,7 @@ promptv secrets list
 #     ✓ REDIS_URL
 
 # Filter by project
-promptv secrets list --project my-app
+promptv secret list --project my-app
 ```
 
 ### Exporting Secrets
@@ -368,22 +368,22 @@ Similar to `source .env`, you can export all secrets for a project to your curre
 
 ```bash
 # Basic usage - export default project
-source <(promptv secrets export)
-promptv secrets export > .env
+source <(promptv secret export)
+promptv secret export > .env
 
 # Export specific project
-source <(promptv secrets export --project moonshoot)
+source <(promptv secret export --project moonshoot)
 
 # Alternative syntax with eval
-eval "$(promptv secrets export --project moonshoot)"
+eval "$(promptv secret export --project moonshoot)"
 
 # Exclude provider API keys
-source <(promptv secrets export --project moonshoot --no-include-providers)
+source <(promptv secret export --project moonshoot --no-include-providers)
 
 # Different output formats
-promptv secrets export --format json
-promptv secrets export --format shell
-promptv secrets export --format dotenv
+promptv secret export --format json
+promptv secret export --format shell
+promptv secret export --format dotenv
 ```
 
 **Shell Function Helper** (add to `~/.bashrc` or `~/.zshrc`):
@@ -391,7 +391,7 @@ promptv secrets export --format dotenv
 ```bash
 # Convenient alias for exporting secrets
 promptv-export() {
-    eval "$(promptv secrets export --format shell --project ${1:-default})"
+    eval "$(promptv secret export --format shell --project ${1:-default})"
 }
 
 # Usage:
@@ -410,13 +410,13 @@ promptv-export moonshoot      # Export moonshoot project
 
 ```bash
 # Shell format (default) - includes export statements
-promptv secrets export --project moonshoot --format shell
+promptv secret export --project moonshoot --format shell
 
 # Dotenv format (standard .env file format)
-promptv secrets export --project moonshoot --format dotenv
+promptv secret export --project moonshoot --format dotenv
 
 # JSON format for other tools
-promptv secrets export --project moonshoot --format json
+promptv secret export --project moonshoot --format json
 ```
 
 ### Security
@@ -432,13 +432,13 @@ promptv secrets export --project moonshoot --format json
 
 ```bash
 # These commands save to ~/.promptv/prompts/default/
-promptv commit --source prompt.md --name my-prompt
-promptv set my-prompt -c "Content here"
+promptv prompt commit --source prompt.md --name my-prompt
+promptv prompt set my-prompt -c "Content here"
 promptv tag create my-prompt prod
 
 # These commands save to ~/.promptv/prompts/my-app/
-promptv commit --source prompt.md --name my-prompt --project my-app
-promptv set my-prompt -c "Content here" --project my-app
+promptv prompt commit --source prompt.md --name my-prompt --project my-app
+promptv prompt set my-prompt -c "Content here" --project my-app
 promptv tag create my-prompt prod --project my-app
 ```
 
@@ -446,13 +446,13 @@ Use project tags to organize prompts and secrets:
 
 ```bash
 # Set a prompt with project tag
-promptv commit --source prompt.md --name my-prompt --project my-app
+promptv prompt commit --source prompt.md --name my-prompt --project my-app
 
 # Set project-scoped secret
-promptv secrets set DATABASE_URL --project my-app
+promptv secret set DATABASE_URL --project my-app
 
 # Get secret for specific project
-promptv secrets get DATABASE_URL --project my-app
+promptv secret get DATABASE_URL --project my-app
 ```
 
 ## Variable Substitution
@@ -470,7 +470,7 @@ Support: {{ support_email }}
 Retrieve with variables:
 
 ```bash
-promptv get welcome-email --var "name=Alice product=MyApp support_email=help@example.com"
+promptv prompt get welcome-email --var "name=Alice product=MyApp support_email=help@example.com"
 ```
 
 Render with variables:
@@ -523,43 +523,43 @@ promptv diff my-prompt 1 2 --format side-by-side
 
 ```bash
 # Commit a prompt from a file
-promptv commit --source my_prompt.txt --name chatgpt-instructions
+promptv prompt commit --source my_prompt.txt --name chatgpt-instructions
 
 # Create/update a prompt with direct content
-promptv set summarization-prompt -c "Summarize the following text in 3 sentences."
+promptv prompt set summarization-prompt -c "Summarize the following text in 3 sentences."
 
 # Get the latest version of a prompt with variables
-promptv get email-template --var "name=John product=Widget"
+promptv prompt get email-template --var "name=John product=Widget"
 
 # Render a prompt with variables
 promptv render email-template --var "name=John product=Widget"
 
 # Edit a prompt in your editor
-promptv edit email-template
+promptv prompt edit email-template
 
 # Create a tag for production
 promptv tag create email-template prod --version 3
 
 # Get production version
-promptv get email-template --label prod
+promptv prompt get email-template --label prod
 
 # Compare versions
 promptv diff email-template 2 3 --format side-by-side
 
 # List all versions of a prompt
-promptv list chatgpt-instructions
+promptv prompt list chatgpt-instructions
 
 # Remove prompts
-promptv remove chatgpt-instructions summarization-prompt --yes
+promptv prompt remove chatgpt-instructions summarization-prompt --yes
 
 # Set API key
-promptv secrets set openai --provider
+promptv secret set openai --provider
 
 # Estimate cost
 promptv cost estimate my-prompt --model gpt-4
 
 # Export secrets to .env file
-promptv secrets export --project my-app > .env
+promptv secret export --project my-app > .env
 ```
 
 ## Development

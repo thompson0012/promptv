@@ -41,14 +41,14 @@ class TestDiffIntegration:
         prompt_file = tmp_path / "prompt_v1.md"
         prompt_file.write_text("Hello {{name}}!\nThis is version 1.")
         
-        result = runner.invoke(cli, ['commit', '--source', str(prompt_file), '--name', 'test-prompt'])
+        result = runner.invoke(cli, ['prompt', 'commit', '--source', str(prompt_file), '--name', 'test-prompt'])
         assert result.exit_code == 0, f"Commit failed: {result.output}"
-        
+
         # Create second version
         prompt_file2 = tmp_path / "prompt_v2.md"
         prompt_file2.write_text("Hello {{name}}!\nThis is version 2.\nWith a new line.")
-        
-        result = runner.invoke(cli, ['set', 'test-prompt', '-f', str(prompt_file2)])
+
+        result = runner.invoke(cli, ['prompt', 'set', 'test-prompt', '-f', str(prompt_file2)])
         assert result.exit_code == 0, f"Set failed: {result.output}"
         
         # Test diff
@@ -65,17 +65,17 @@ class TestDiffIntegration:
         prompt_file = tmp_path / "prompt_v1.md"
         prompt_file.write_text("Hello world!\nVersion 1.")
         
-        result = runner.invoke(cli, ['commit', '--source', str(prompt_file), '--name', 'test-prompt'])
+        result = runner.invoke(cli, ['prompt', 'commit', '--source', str(prompt_file), '--name', 'test-prompt'])
         assert result.exit_code == 0
-        
+
         result = runner.invoke(cli, ['tag', 'create', 'test-prompt', 'v1', '--version', '1'])
         assert result.exit_code == 0
-        
+
         # Create second version with tag
         prompt_file2 = tmp_path / "prompt_v2.md"
         prompt_file2.write_text("Hello universe!\nVersion 2.")
-        
-        result = runner.invoke(cli, ['set', 'test-prompt', '-f', str(prompt_file2)])
+
+        result = runner.invoke(cli, ['prompt', 'set', 'test-prompt', '-f', str(prompt_file2)])
         assert result.exit_code == 0
         
         result = runner.invoke(cli, ['tag', 'create', 'test-prompt', 'v2', '--version', '2'])
@@ -93,11 +93,11 @@ class TestDiffIntegration:
         prompt_file = tmp_path / "prompt.md"
         prompt_file.write_text("Version 1")
         
-        result = runner.invoke(cli, ['commit', '--source', str(prompt_file), '--name', 'test-prompt'])
+        result = runner.invoke(cli, ['prompt', 'commit', '--source', str(prompt_file), '--name', 'test-prompt'])
         assert result.exit_code == 0
-        
+
         prompt_file.write_text("Version 2")
-        result = runner.invoke(cli, ['set', 'test-prompt', '-f', str(prompt_file)])
+        result = runner.invoke(cli, ['prompt', 'set', 'test-prompt', '-f', str(prompt_file)])
         assert result.exit_code == 0
         
         # Diff with latest
@@ -111,11 +111,11 @@ class TestDiffIntegration:
         prompt_file = tmp_path / "prompt.md"
         prompt_file.write_text("Line 1\nLine 2\nLine 3")
         
-        result = runner.invoke(cli, ['commit', '--source', str(prompt_file), '--name', 'test-prompt'])
+        result = runner.invoke(cli, ['prompt', 'commit', '--source', str(prompt_file), '--name', 'test-prompt'])
         assert result.exit_code == 0
-        
+
         prompt_file.write_text("Line 1\nModified Line 2\nLine 3")
-        result = runner.invoke(cli, ['set', 'test-prompt', '-f', str(prompt_file)])
+        result = runner.invoke(cli, ['prompt', 'set', 'test-prompt', '-f', str(prompt_file)])
         assert result.exit_code == 0
         
         # Test unified format
@@ -130,11 +130,11 @@ class TestDiffIntegration:
         prompt_file = tmp_path / "prompt.md"
         prompt_file.write_text("Content A")
         
-        result = runner.invoke(cli, ['commit', '--source', str(prompt_file), '--name', 'test-prompt'])
+        result = runner.invoke(cli, ['prompt', 'commit', '--source', str(prompt_file), '--name', 'test-prompt'])
         assert result.exit_code == 0
-        
+
         prompt_file.write_text("Content B")
-        result = runner.invoke(cli, ['set', 'test-prompt', '-f', str(prompt_file)])
+        result = runner.invoke(cli, ['prompt', 'set', 'test-prompt', '-f', str(prompt_file)])
         assert result.exit_code == 0
         
         # Test JSON format
@@ -158,9 +158,9 @@ class TestDiffIntegration:
         prompt_file = tmp_path / "prompt.md"
         prompt_file.write_text("Content")
         
-        result = runner.invoke(cli, ['commit', '--source', str(prompt_file), '--name', 'test-prompt'])
+        result = runner.invoke(cli, ['prompt', 'commit', '--source', str(prompt_file), '--name', 'test-prompt'])
         assert result.exit_code == 0
-        
+
         # Try to diff with non-existent version
         result = runner.invoke(cli, ['diff', 'test-prompt', '999', '1'])
         
@@ -172,9 +172,9 @@ class TestDiffIntegration:
         prompt_file = tmp_path / "prompt.md"
         prompt_file.write_text("Same content")
         
-        result = runner.invoke(cli, ['commit', '--source', str(prompt_file), '--name', 'test-prompt'])
+        result = runner.invoke(cli, ['prompt', 'commit', '--source', str(prompt_file), '--name', 'test-prompt'])
         assert result.exit_code == 0
-        
+
         # Diff same version
         result = runner.invoke(cli, ['diff', 'test-prompt', '1', '1'])
         

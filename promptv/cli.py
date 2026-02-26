@@ -57,21 +57,31 @@ def cli(ctx):
                 pass
 
 
-@cli.command()
+@cli.group()
+def prompt():
+    """
+    Manage prompts: create, retrieve, update, and organize.
+
+    Commands for working with prompt versions, metadata, and organization.
+    """
+    pass
+
+
+@prompt.command('commit')
 @click.option('--source', required=True, type=click.Path(exists=True), help='Source file path')
 @click.option('--name', required=True, help='Name for the prompt')
 @click.option('--message', '-m', help='Commit message describing the changes')
 @click.option('--tag', help='Create a tag for this version')
 @click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
-def commit(source, name, message, tag, project):
+def prompt_commit(source, name, message, tag, project):
     """
     Save a prompt file with a specific name.
-    
+
     Examples:
-        promptv commit --source prompt.md --name my-prompt
-        promptv commit --source prompt.md --name my-prompt -m "Updated instructions"
-        promptv commit --source prompt.md --name my-prompt --tag prod
-        promptv commit --source prompt.md --name my-prompt --project my-app
+        promptv prompt commit --source prompt.md --name my-prompt
+        promptv prompt commit --source prompt.md --name my-prompt -m "Updated instructions"
+        promptv prompt commit --source prompt.md --name my-prompt --tag prod
+        promptv prompt commit --source prompt.md --name my-prompt --project my-app
     """
     try:
         manager = PromptManager()
@@ -105,24 +115,24 @@ def commit(source, name, message, tag, project):
         sys.exit(1)
 
 
-@cli.command()
+@prompt.command('set')
 @click.argument('name')
 @click.option('--file', '-f', type=click.Path(exists=True), help='Read content from file')
 @click.option('--content', '-c', help='Direct content input')
 @click.option('--message', '-m', help='Commit message describing the changes')
 @click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
-def set(name, file, content, message, project):
+def prompt_set(name, file, content, message, project):
     """
     Set/update a prompt with the given name.
-    
+
     You can provide content either from a file or directly:
-    
+
     Examples:
-        promptv set my-prompt -f prompt.txt
-        promptv set my-prompt -c "This is my prompt content"
-        promptv set my-prompt -m "Updated with new instructions" -f prompt.txt
-        promptv set my-prompt --project my-app -f prompt.txt
-        echo "Content" | promptv set my-prompt
+        promptv prompt set my-prompt -f prompt.txt
+        promptv prompt set my-prompt -c "This is my prompt content"
+        promptv prompt set my-prompt -m "Updated with new instructions" -f prompt.txt
+        promptv prompt set my-prompt --project my-app -f prompt.txt
+        echo "Content" | promptv prompt set my-prompt
     """
     try:
         manager = PromptManager()
@@ -157,25 +167,25 @@ def set(name, file, content, message, project):
         sys.exit(1)
 
 
-@cli.command()
+@prompt.command('edit')
 @click.argument('name')
 @click.option('--version', default='latest', help='Version to edit (default: latest)')
 @click.option('--message', '-m', help='Commit message for the changes')
 @click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
 @click.option('--editor', help='Editor to use (default: $EDITOR or $VISUAL or nano)')
-def edit(name, version, message, project, editor):
+def prompt_edit(name, version, message, project, editor):
     """
     Edit a prompt directly in your terminal editor.
-    
+
     Opens the specified prompt version in your default editor ($EDITOR or $VISUAL),
     or nano if neither is set. After editing, saves the changes as a new version.
-    
+
     Examples:
-        promptv edit my-prompt
-        promptv edit my-prompt --version 2
-        promptv edit my-prompt -m "Updated instructions"
-        promptv edit my-prompt --project my-app
-        promptv edit my-prompt --editor vim
+        promptv prompt edit my-prompt
+        promptv prompt edit my-prompt --version 2
+        promptv prompt edit my-prompt -m "Updated instructions"
+        promptv prompt edit my-prompt --project my-app
+        promptv prompt edit my-prompt --editor vim
     """
     try:
         manager = PromptManager()
@@ -259,24 +269,24 @@ def parse_variables(ctx, param, value):
     return var_dict
 
 
-@cli.command()
+@prompt.command('get')
 @click.argument('name')
 @click.option('--version', default=None, help='Version to retrieve')
 @click.option('--label', help='Tag/label to retrieve')
-@click.option('--var', multiple=True, callback=parse_variables, 
+@click.option('--var', multiple=True, callback=parse_variables,
               help='Variable substitution (supports: "key1=val1 key2=val2" or multiple --var flags)')
 @click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
-def get(name, version, label, var, project):
+def prompt_get(name, version, label, var, project):
     """
     Retrieve a specific version of a prompt.
-    
+
     Examples:
-        promptv get my-prompt --version latest
-        promptv get my-prompt --version 1
-        promptv get my-prompt --label prod
-        promptv get my-prompt --var "name=Alice count=5"
-        promptv get my-prompt --var key1=val1 --var key2=val2
-        promptv get my-prompt --project my-app
+        promptv prompt get my-prompt --version latest
+        promptv prompt get my-prompt --version 1
+        promptv prompt get my-prompt --label prod
+        promptv prompt get my-prompt --var "name=Alice count=5"
+        promptv prompt get my-prompt --var key1=val1 --var key2=val2
+        promptv prompt get my-prompt --project my-app
     """
     try:
         manager = PromptManager()
@@ -339,23 +349,23 @@ def get(name, version, label, var, project):
         sys.exit(1)
 
 
-@cli.command(name='list')
+@prompt.command(name='list')
 @click.argument('name', required=False)
 @click.option('--show-tags', is_flag=True, help='Show tags for each prompt')
 @click.option('--show-variables', is_flag=True, help='Show variables for each version')
 @click.option('--project', default=None, help='Filter by project name (default: show all projects)')
-def list_command(name, show_tags, show_variables, project):
+def prompt_list(name, show_tags, show_variables, project):
     """
     List all versions and metadata for a specific prompt name.
     If no name is provided, list all prompts.
-    
+
     Examples:
-        promptv list
-        promptv list my-prompt
-        promptv list my-prompt --show-tags
-        promptv list my-prompt --show-variables
-        promptv list --project my-app
-        promptv list my-prompt --project my-app
+        promptv prompt list
+        promptv prompt list my-prompt
+        promptv prompt list my-prompt --show-tags
+        promptv prompt list my-prompt --show-variables
+        promptv prompt list --project my-app
+        promptv prompt list my-prompt --project my-app
     """
     try:
         manager = PromptManager()
@@ -484,19 +494,19 @@ def list_command(name, show_tags, show_variables, project):
         sys.exit(1)
 
 
-@cli.command()
+@prompt.command('remove')
 @click.argument('names', nargs=-1, required=True)
 @click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
 @click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
-def remove(names, yes, project):
+def prompt_remove(names, yes, project):
     """
     Remove one or more prompts by name.
-    
+
     Examples:
-        promptv remove my-prompt
-        promptv remove prompt1 prompt2 prompt3
-        promptv remove my-prompt --yes
-        promptv remove my-prompt --project my-app
+        promptv prompt remove my-prompt
+        promptv prompt remove prompt1 prompt2 prompt3
+        promptv prompt remove my-prompt --yes
+        promptv prompt remove my-prompt --project my-app
     """
     try:
         manager = PromptManager()
@@ -806,23 +816,23 @@ def render(prompt_name, version, label, var, project):
 
 
 @cli.group()
-def variables():
+def variable():
     """Manage and inspect variables in prompts."""
     pass
 
 
-@variables.command('list')
+@variable.command('list')
 @click.argument('prompt_name')
 @click.option('--version', help='Version to inspect (default: latest)')
 @click.option('--project', default='default', help='Project name for organizing prompts (default: default)')
-def variables_list(prompt_name, version, project):
+def variable_list(prompt_name, version, project):
     """
     List all variables in a prompt.
-    
+
     Examples:
-        promptv variables list my-prompt
-        promptv variables list my-prompt --version 2
-        promptv variables list my-prompt --project my-app
+        promptv variable list my-prompt
+        promptv variable list my-prompt --version 2
+        promptv variable list my-prompt --project my-app
     """
     try:
         manager = PromptManager()
@@ -855,51 +865,51 @@ def variables_list(prompt_name, version, project):
 
 
 @cli.group()
-def secrets():
+def secret():
     """
     Manage API keys and secrets securely.
-    
+
     Supports both provider API keys and generic project-scoped secrets.
     All secrets are stored encrypted in ~/.promptv/.secrets/secrets.json
-    
+
     Examples:
         # Provider API keys
-        promptv secrets set openai --provider
-        promptv secrets get openai --provider
-        
+        promptv secret set openai --provider
+        promptv secret get openai --provider
+
         # Generic secrets
-        promptv secrets set DATABASE_URL
-        promptv secrets set API_KEY --project my-app
-        promptv secrets list
+        promptv secret set DATABASE_URL
+        promptv secret set API_KEY --project my-app
+        promptv secret list
     """
     pass
 
 
-@secrets.command('set')
+@secret.command('set')
 @click.argument('key')
-@click.option('--provider', is_flag=True, 
+@click.option('--provider', is_flag=True,
               help='Set as provider API key (validates against supported providers)')
-@click.option('--project', default='default', 
+@click.option('--project', default='default',
               help='Project name for secret scoping (default: "default")')
-def secrets_set(key, provider, project):
+def secret_set(key, provider, project):
     """
     Set an API key or environment secret.
-    
+
     Provider API keys are global and validated against supported providers.
     Generic secrets can be scoped to specific projects.
-    
+
     Examples:
         # Provider API key
-        promptv secrets set openai --provider
-        promptv secrets set anthropic --provider
-        
+        promptv secret set openai --provider
+        promptv secret set anthropic --provider
+
         # Generic secret (uses "default" project)
-        promptv secrets set DATABASE_URL
-        promptv secrets set MY_API_KEY
-        
+        promptv secret set DATABASE_URL
+        promptv secret set MY_API_KEY
+
         # Project-scoped secret
-        promptv secrets set DATABASE_URL --project my-app
-        promptv secrets set REDIS_URL --project moonshoot
+        promptv secret set DATABASE_URL --project my-app
+        promptv secret set REDIS_URL --project moonshoot
     """
     try:
         manager = SecretsManager()
@@ -960,27 +970,27 @@ def secrets_set(key, provider, project):
         sys.exit(1)
 
 
-@secrets.command('get')
+@secret.command('get')
 @click.argument('key')
 @click.option('--provider', is_flag=True,
               help='Get provider API key')
 @click.option('--project', default='default',
               help='Project name for secret scoping (default: "default")')
-def secrets_get(key, provider, project):
+def secret_get(key, provider, project):
     """
     Retrieve a secret or API key.
-    
+
     Shows the last 4 characters of provider API keys for security.
     Generic secrets are displayed in full.
-    
+
     Examples:
         # Provider API key
-        promptv secrets get openai --provider
-        promptv secrets get anthropic --provider
-        
+        promptv secret get openai --provider
+        promptv secret get anthropic --provider
+
         # Generic secret
-        promptv secrets get DATABASE_URL
-        promptv secrets get API_KEY --project my-app
+        promptv secret get DATABASE_URL
+        promptv secret get API_KEY --project my-app
     """
     try:
         manager = SecretsManager()
@@ -1002,7 +1012,7 @@ def secrets_get(key, provider, project):
             else:
                 click.echo(f"❌ No API key found for provider '{key}'", err=True)
                 click.echo(f"\nTo add an API key, run:")
-                click.echo(f"  promptv secrets set {key} --provider")
+                click.echo(f"  promptv secret set {key} --provider")
                 sys.exit(1)
         else:
             # Get generic secret
@@ -1019,9 +1029,9 @@ def secrets_get(key, provider, project):
                     click.echo(f"   Project: {project}", err=True)
                 click.echo(f"\nTo add a secret, run:")
                 if project != 'default':
-                    click.echo(f"  promptv secrets set {key} --project {project}")
+                    click.echo(f"  promptv secret set {key} --project {project}")
                 else:
-                    click.echo(f"  promptv secrets set {key}")
+                    click.echo(f"  promptv secret set {key}")
                 sys.exit(1)
         
     except SecretsManagerError as e:
@@ -1032,19 +1042,19 @@ def secrets_get(key, provider, project):
         sys.exit(1)
 
 
-@secrets.command('list')
-@click.option('--project', 
+@secret.command('list')
+@click.option('--project',
               help='Filter by project name (shows all if not specified)')
-def secrets_list(project):
+def secret_list(project):
     """
     List all configured secrets and API keys.
-    
+
     Shows provider API keys and project-scoped secrets grouped by project.
-    
+
     Examples:
-        promptv secrets list
-        promptv secrets list --project my-app
-        promptv secrets list --project default
+        promptv secret list
+        promptv secret list --project my-app
+        promptv secret list --project default
     """
     try:
         manager = SecretsManager()
@@ -1059,9 +1069,9 @@ def secrets_list(project):
             else:
                 click.echo("No secrets configured.")
             click.echo("\nTo add secrets, run:")
-            click.echo("  promptv secrets set <key>                    # Generic secret")
-            click.echo("  promptv secrets set <key> --project <name>   # Project-scoped secret")
-            click.echo("  promptv secrets set <provider> --provider    # Provider API key")
+            click.echo("  promptv secret set <key>                    # Generic secret")
+            click.echo("  promptv secret set <key> --project <name>   # Project-scoped secret")
+            click.echo("  promptv secret set <provider> --provider    # Provider API key")
             return
         
         # Display provider API keys
@@ -1102,25 +1112,25 @@ def secrets_list(project):
         sys.exit(1)
 
 
-@secrets.command('delete')
+@secret.command('delete')
 @click.argument('key')
 @click.option('--provider', is_flag=True,
               help='Delete provider API key')
 @click.option('--project', default='default',
               help='Project name for secret scoping (default: "default")')
 @click.option('--yes', '-y', is_flag=True, help='Skip confirmation')
-def secrets_delete(key, provider, project, yes):
+def secret_delete(key, provider, project, yes):
     """
     Delete a secret or API key.
-    
+
     Examples:
         # Provider API key
-        promptv secrets delete openai --provider
-        promptv secrets delete anthropic --provider --yes
-        
+        promptv secret delete openai --provider
+        promptv secret delete anthropic --provider --yes
+
         # Generic secret
-        promptv secrets delete DATABASE_URL
-        promptv secrets delete API_KEY --project my-app --yes
+        promptv secret delete DATABASE_URL
+        promptv secret delete API_KEY --project my-app --yes
     """
     try:
         manager = SecretsManager()
@@ -1171,15 +1181,15 @@ def secrets_delete(key, provider, project, yes):
         sys.exit(1)
 
 
-@secrets.command('test')
+@secret.command('test')
 @click.argument('provider')
-def secrets_test(provider):
+def secret_test(provider):
     """
     Test if an API key is configured for a provider.
-    
+
     Examples:
-        promptv secrets test openai
-        promptv secrets test anthropic
+        promptv secret test openai
+        promptv secret test anthropic
     """
     try:
         manager = SecretsManager()
@@ -1195,7 +1205,7 @@ def secrets_test(provider):
         else:
             click.echo(f"❌ No API key configured for '{provider}'")
             click.echo("\nTo add an API key, run:")
-            click.echo(f"  promptv secrets set {provider}")
+            click.echo(f"  promptv secret set {provider}")
         
     except SecretsManagerError as e:
         click.echo(f"\n❌ Secrets Error:\n{e}", err=True)
@@ -1205,55 +1215,55 @@ def secrets_test(provider):
         sys.exit(1)
 
 
-@secrets.command('export')
+@secret.command('export')
 @click.option('--project', default='default',
               help='Project name to export secrets from (default: "default")')
-@click.option('--format', 'output_format', 
+@click.option('--format', 'output_format',
               type=click.Choice(['shell', 'json', 'dotenv'], case_sensitive=False),
               default='dotenv',
               help='Output format: dotenv (default - standard .env file format), shell (for sourcing), or json')
 @click.option('--include-providers/--no-include-providers',
               default=True,
               help='Include provider API keys (default: True)')
-def secrets_export(project, output_format, include_providers):
+def secret_export(project, output_format, include_providers):
     """
     Export secrets as environment variables.
-    
+
     By default, outputs standard .env file format (KEY=value) that can be
     saved to a file or used with tools that read .env files.
-    
+
     Use --format shell for export statements that can be sourced into your shell.
-    
+
     Usage:
         # Save to .env file (default format)
-        promptv secrets export --project moonshoot > .env
-        
+        promptv secret export --project moonshoot > .env
+
         # Source into shell (shell format)
-        source <(promptv secrets export --format shell --project moonshoot)
-        eval "$(promptv secrets export --format shell --project moonshoot)"
-    
+        source <(promptv secret export --format shell --project moonshoot)
+        eval "$(promptv secret export --format shell --project moonshoot)"
+
     Shell Function (add to ~/.bashrc or ~/.zshrc):
         promptv-export() {
-            eval "$(promptv secrets export --format shell --project ${1:-default})"
+            eval "$(promptv secret export --format shell --project ${1:-default})"
         }
-        
+
         # Then use: promptv-export moonshoot
-    
+
     Examples:
         # Export to .env file (default)
-        promptv secrets export > .env
-        
+        promptv secret export > .env
+
         # Export specific project to .env file
-        promptv secrets export --project moonshoot > .env
-        
+        promptv secret export --project moonshoot > .env
+
         # Shell export format for sourcing
-        source <(promptv secrets export --format shell --project moonshoot)
-        
+        source <(promptv secret export --format shell --project moonshoot)
+
         # Exclude provider API keys
-        promptv secrets export --project moonshoot --no-include-providers > .env
-        
+        promptv secret export --project moonshoot --no-include-providers > .env
+
         # JSON output for other tools
-        promptv secrets export --project moonshoot --format json
+        promptv secret export --project moonshoot --format json
     """
     try:
         manager = SecretsManager()
@@ -1361,7 +1371,7 @@ def cost_estimate(prompt_name, version, label, var, model, provider, output_toke
         format_cost_estimate(cost, show_detail=True)
 
     except PromptNotFoundError as e:
-        format_error(str(e), "Use 'promptv list' to see available prompts")
+        format_error(str(e), "Use 'promptv prompt list' to see available prompts")
         sys.exit(1)
     except TagNotFoundError as e:
         format_error(str(e), "Use 'promptv tag list <prompt>' to see available tags")
@@ -1434,7 +1444,7 @@ def cost_tokens(prompt_name, version, label, var, model, provider, project):
         format_token_count(count, model, provider)
 
     except PromptNotFoundError as e:
-        format_error(str(e), "Use 'promptv list' to see available prompts")
+        format_error(str(e), "Use 'promptv prompt list' to see available prompts")
         sys.exit(1)
     except TagNotFoundError as e:
         format_error(str(e), "Use 'promptv tag list <prompt>' to see available tags")
@@ -1525,7 +1535,7 @@ def cost_compare(prompt_name, version, label, var, models, output_tokens, projec
         format_cost_comparison(comparisons)
 
     except PromptNotFoundError as e:
-        format_error(str(e), "Use 'promptv list' to see available prompts")
+        format_error(str(e), "Use 'promptv prompt list' to see available prompts")
         sys.exit(1)
     except TagNotFoundError as e:
         format_error(str(e), "Use 'promptv tag list <prompt>' to see available tags")
@@ -1626,12 +1636,12 @@ def diff(prompt_name, ref_a, ref_b, diff_format):
         
         # Print diff output
         click.echo(diff_output)
-        
+
     except PromptNotFoundError as e:
-        format_error(str(e), "Use 'promptv list' to see available prompts")
+        format_error(str(e), "Use 'promptv prompt list' to see available prompts")
         sys.exit(1)
     except VersionNotFoundError as e:
-        format_error(str(e), "Use 'promptv history <prompt>' to see available versions")
+        format_error(str(e), "Use 'promptv prompt list <prompt>' to see available versions")
         sys.exit(1)
     except TagNotFoundError as e:
         format_error(str(e), "Use 'promptv tag list <prompt>' to see available tags")
@@ -1824,10 +1834,10 @@ def init(force):
         click.echo()
         click.echo("Next steps:")
         click.echo("  1. Set up API keys:")
-        click.echo("     promptv secrets set openai --provider")
+        click.echo("     promptv secret set openai --provider")
         click.echo()
         click.echo("  2. Create your first prompt:")
-        click.echo("     promptv set my-prompt -c 'You are a helpful assistant'")
+        click.echo("     promptv prompt set my-prompt -c 'You are a helpful assistant'")
         click.echo()
         click.echo("  3. Customize pricing (optional):")
         click.echo("     Edit ~/.promptv/.config/pricing.yaml")
@@ -1903,8 +1913,8 @@ def test(prompt_name, version, project, llm, provider, endpoint, custom_endpoint
         # Check if prompt exists
         if not manager.prompt_exists(prompt_name, project=project):
             click.echo(f"Error: Prompt '{prompt_name}' not found in project '{project}'", err=True)
-            click.echo(f"Run 'promptv list --project {project}' to see available prompts")
-            click.echo(f"Create with 'promptv commit --source file.md --name {prompt_name} --project {project}'")
+            click.echo(f"Run 'promptv prompt list --project {project}' to see available prompts")
+            click.echo(f"Create with 'promptv prompt commit --source file.md --name {prompt_name} --project {project}'")
             sys.exit(1)
         
         # Load prompt content
@@ -1957,7 +1967,7 @@ def test(prompt_name, version, project, llm, provider, endpoint, custom_endpoint
             
             if not effective_api_key and not custom_endpoint:
                 click.echo(f"Error: API key not found for provider '{provider_name}'", err=True)
-                click.echo(f"Set your API key with: promptv secrets set {api_key_name}")
+                click.echo(f"Set your API key with: promptv secret set {api_key_name}")
                 sys.exit(1)
         
         # Create provider - handle custom endpoint vs regular providers

@@ -39,7 +39,7 @@ class TestPhase1Integration:
         
         # 1. Commit the prompt
         result = runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'test-prompt',
             '--message', 'Initial version'
@@ -60,7 +60,7 @@ class TestPhase1Integration:
         
         # 3. Get prompt by tag
         result = runner.invoke(cli, [
-            'get',
+            'prompt', 'get',
             'test-prompt',
             '--label', 'prod'
         ])
@@ -75,7 +75,7 @@ class TestPhase1Integration:
         
         # Commit the prompt
         result = runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'greeting'
         ])
@@ -98,7 +98,7 @@ class TestPhase1Integration:
         prompt_file.write_text("Tagged content")
         
         result = runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'my-prompt'
         ])
@@ -140,7 +140,7 @@ class TestPhase1Integration:
         prompt_file.write_text("Auto-tagged content")
         
         result = runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'auto-tagged',
             '--tag', 'prod'
@@ -156,7 +156,7 @@ class TestPhase1Integration:
     def test_set_with_message(self, runner, isolated_promptv):
         """Test set command with commit message."""
         result = runner.invoke(cli, [
-            'set',
+            'prompt', 'set',
             'my-prompt',
             '--content', 'Test content',
             '--message', 'Created new prompt'
@@ -171,15 +171,15 @@ class TestPhase1Integration:
         prompt_file.write_text("List test content")
         
         result = runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'list-test',
             '--tag', 'v1.0'
         ])
         assert result.exit_code == 0, f"Commit failed: {result.output}"
-        
+
         result = runner.invoke(cli, [
-            'list',
+            'prompt', 'list',
             'list-test',
             '--show-tags'
         ])
@@ -193,14 +193,14 @@ class TestPhase1Integration:
         prompt_file.write_text("Hello {{name}}, your score is {{score}}")
         
         result = runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'var-test'
         ])
         assert result.exit_code == 0, f"Commit failed: {result.output}"
-        
+
         result = runner.invoke(cli, [
-            'list',
+            'prompt', 'list',
             'var-test',
             '--show-variables'
         ])
@@ -215,13 +215,13 @@ class TestPhase1Integration:
         prompt_file.write_text("Template with {{var1}}, {{var2}}, and {{var3}}")
         
         result = runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'multi-var'
         ])
         assert result.exit_code == 0, f"Commit failed: {result.output}"
-        
-        result = runner.invoke(cli, ['variables', 'list', 'multi-var'])
+
+        result = runner.invoke(cli, ['variable', 'list', 'multi-var'])
         assert result.exit_code == 0, f"Variables list failed: {result.output}"
         assert "var1" in result.output
         assert "var2" in result.output
@@ -235,14 +235,14 @@ class TestPhase1Integration:
         prompt_file.write_text("Welcome {{user}}, temperature is {{temp}}")
         
         runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'substitution'
         ])
-        
+
         # Get with substitution
         result = runner.invoke(cli, [
-            'get',
+            'prompt', 'get',
             'substitution',
             '--var', 'user=Bob',
             '--var', 'temp=0.7'
@@ -257,7 +257,7 @@ class TestPhase1Integration:
         prompt_file.write_text("Hello {{name}}, you have {{count}} items")
         
         runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'missing-vars'
         ])
@@ -280,7 +280,7 @@ class TestPhase1Integration:
         prompt_file.write_text("Content")
         
         runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'dup-test'
         ])
@@ -300,15 +300,15 @@ class TestPhase1Integration:
         prompt_file.write_text("Version 1")
         
         runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'update-test'
         ])
-        
+
         # Create v2
         prompt_file.write_text("Version 2")
         runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'update-test'
         ])
@@ -336,13 +336,13 @@ class TestPhase1Integration:
             prompt_file = tmp_path / f"prompt{i}.md"
             prompt_file.write_text(f"Content {i}")
             result = runner.invoke(cli, [
-                'commit',
+                'prompt', 'commit',
                 '--source', str(prompt_file),
                 '--name', f'prompt-{i}'
             ])
             assert result.exit_code == 0, f"Commit failed: {result.output}"
-        
-        result = runner.invoke(cli, ['list'])
+
+        result = runner.invoke(cli, ['prompt', 'list'])
         assert result.exit_code == 0
         assert "Found 3 prompt(s)" in result.output
         assert "default/" in result.output
@@ -362,13 +362,13 @@ class TestBackwardCompatibility:
         prompt_file.write_text("Backward compatible content")
         
         result = runner.invoke(cli, [
-            'commit',
+            'prompt', 'commit',
             '--source', str(prompt_file),
             '--name', 'compat-test'
         ])
         assert result.exit_code == 0
-        
+
         # Get the prompt
-        result = runner.invoke(cli, ['get', 'compat-test'])
+        result = runner.invoke(cli, ['prompt', 'get', 'compat-test'])
         assert result.exit_code == 0
         assert "Backward compatible content" in result.output
